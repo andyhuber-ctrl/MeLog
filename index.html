@@ -12,7 +12,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <style>
   :root {
     --bg: #E9F1EF; --surface: #FFFFFF; --surface-2: #F2F7F6;
@@ -142,10 +141,6 @@
   .field-row { display: flex; gap: 10px; }
   .field-row .field { flex: 1; min-width: 0; }
   .form-hint { font-size: 0.74rem; color: var(--ink-faint); margin: -6px 0 12px; }
-  #photoPreview { margin-top: 8px; }
-  #photoPreview img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; display: block; }
-  #photoPreview button { margin-top: 6px; font-size: 0.78rem; border: 1px solid var(--danger); color: var(--danger); background: transparent; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
-  .card-photo { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-top: 8px; display: block; cursor: pointer; }
   .sheet-actions { display: flex; gap: 10px; margin-top: 16px; }
   .btn-primary, .btn-secondary { flex: 1; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 0.95rem; border: none; cursor: pointer; }
   .btn-primary { background: var(--accent); color: #fff; }
@@ -235,7 +230,6 @@
   firebase.initializeApp(firebaseConfig);
   var auth = firebase.auth();
   var db = firebase.firestore();
-  var storage = firebase.storage();
 
   var state = {
     entries: [],
@@ -324,7 +318,6 @@
             '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" +
             (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
             (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
-            (e.photoUrl ? '<img class="card-photo" src="' + escapeHtml(e.photoUrl) + '" alt="" onclick="window.open(this.src, \'_blank\')" />' : "") +
             '<div class="card-actions">' +
               '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a>' +
               '<a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' +
@@ -529,7 +522,6 @@
     weather: '<div class="field"><label for="f_weather">Wetter</label><input id="f_weather" type="text" placeholder="sonnig, wolkig …" /></div>'
   };
   var currentType = "spot", currentLanded = true, sheetEl = null;
-  var existingPhotoUrl = null, removeExistingPhoto = false;
 
   function sheetTemplate() {
     return '<div class="sheet-backdrop" id="sheetBackdrop"><div class="sheet">' +
@@ -548,7 +540,6 @@
       '<button type="button" class="btn-secondary" id="locateBtn" style="margin-bottom:12px">📍 Aktuellen Standort verwenden</button>' +
       '<div id="dynamicFields"></div>' +
       '<div class="field"><label for="f_notes">Notizen</label><textarea id="f_notes" placeholder="Köder, Bedingungen, Beobachtungen …"></textarea></div>' +
-      '<div class="field"><label for="f_photo">Foto (optional)</label><input id="f_photo" type="file" accept="image/*" /><div id="photoPreview"></div></div>' +
       '<div class="sheet-actions">' +
         '<button type="button" class="btn-secondary" id="cancelBtn">Abbrechen</button>' +
         '<button type="button" class="btn-primary" id="saveBtn">Speichern</button>' +
@@ -602,25 +593,12 @@
     });
   }
 
-  function renderPhotoPreview(src) {
-    var box = document.getElementById("photoPreview");
-    if (!src) { box.innerHTML = ""; return; }
-    box.innerHTML = '<img src="' + src + '" alt="" /><button type="button" id="removePhotoBtn">Foto entfernen</button>';
-    document.getElementById("removePhotoBtn").addEventListener("click", function () {
-      removeExistingPhoto = true;
-      document.getElementById("f_photo").value = "";
-      renderPhotoPreview(null);
-    });
-  }
-
   function openSheet(entry, preset) {
     document.body.insertAdjacentHTML("beforeend", sheetTemplate());
     sheetEl = document.getElementById("sheetBackdrop");
     state.editingId = entry ? entry.id : null;
     currentType = entry ? entry.type : (preset && preset.type) || "spot";
     currentLanded = entry ? entry.landed !== false : true;
-    existingPhotoUrl = entry ? (entry.photoUrl || null) : null;
-    removeExistingPhoto = false;
     document.getElementById("sheetTitle").textContent = entry ? "Eintrag bearbeiten" : "Neuer Eintrag";
     setType(currentType);
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
@@ -632,19 +610,10 @@
       document.getElementById("f_lng").value = entry.lng;
       document.getElementById("f_notes").value = entry.notes || "";
       fillDynamic(entry);
-      renderPhotoPreview(existingPhotoUrl);
     } else if (preset) {
       document.getElementById("f_lat").value = preset.lat.toFixed(6);
       document.getElementById("f_lng").value = preset.lng.toFixed(6);
     }
-    document.getElementById("f_photo").addEventListener("change", function (ev) {
-      var file = ev.target.files[0];
-      if (!file) return;
-      removeExistingPhoto = false;
-      var reader = new FileReader();
-      reader.onload = function (e) { renderPhotoPreview(e.target.result); };
-      reader.readAsDataURL(file);
-    });
     document.getElementById("cancelBtn").addEventListener("click", closeSheet);
     sheetEl.addEventListener("click", function (ev) { if (ev.target === sheetEl) closeSheet(); });
     document.getElementById("saveBtn").addEventListener("click", saveEntry);
@@ -678,43 +647,6 @@
     setTimeout(function () { t.remove(); }, 2400);
   }
 
-  function compressImage(file, maxDim, quality) {
-    return new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        var img = new Image();
-        img.onload = function () {
-          var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-          var w = Math.max(1, Math.round(img.width * scale));
-          var h = Math.max(1, Math.round(img.height * scale));
-          var canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-          canvas.toBlob(function (blob) {
-            if (blob) resolve(blob); else reject(new Error("Komprimierung fehlgeschlagen"));
-          }, "image/jpeg", quality);
-        };
-        img.onerror = function () { reject(new Error("Bild konnte nicht gelesen werden")); };
-        img.src = e.target.result;
-      };
-      reader.onerror = function () { reject(new Error("Datei konnte nicht gelesen werden")); };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function uploadPhotoIfAny() {
-    var file = document.getElementById("f_photo").files[0];
-    if (!file) return Promise.resolve(removeExistingPhoto ? null : existingPhotoUrl);
-    var saveBtn = document.getElementById("saveBtn");
-    saveBtn.textContent = "Foto wird verkleinert …";
-    return compressImage(file, 1600, 0.8).then(function (blob) {
-      saveBtn.textContent = "Foto wird hochgeladen …";
-      var path = "catches/" + (auth.currentUser ? auth.currentUser.uid : "unknown") + "/" + Date.now() + ".jpg";
-      var ref = storage.ref().child(path);
-      return ref.put(blob).then(function () { return ref.getDownloadURL(); });
-    });
-  }
-
   function saveEntry() {
     var lat = parseFloat(document.getElementById("f_lat").value);
     var lng = parseFloat(document.getElementById("f_lng").value);
@@ -740,17 +672,16 @@
     var saveBtn = document.getElementById("saveBtn");
     saveBtn.disabled = true;
     saveBtn.textContent = "Speichert …";
-    uploadPhotoIfAny().then(function (photoUrl) {
-      data.photoUrl = photoUrl || null;
-      if (state.editingId) {
-        data.updatedAt = new Date().toISOString();
-        return db.collection("entries").doc(state.editingId).update(data);
-      } else {
-        data.createdAt = new Date().toISOString();
-        data.createdBy = auth.currentUser ? (auth.currentUser.displayName || auth.currentUser.email) : null;
-        return db.collection("entries").add(data);
-      }
-    }).then(function () {
+    var promise;
+    if (state.editingId) {
+      data.updatedAt = new Date().toISOString();
+      promise = db.collection("entries").doc(state.editingId).update(data);
+    } else {
+      data.createdAt = new Date().toISOString();
+      data.createdBy = auth.currentUser ? (auth.currentUser.displayName || auth.currentUser.email) : null;
+      promise = db.collection("entries").add(data);
+    }
+    promise.then(function () {
       closeSheet();
       showToast("Gespeichert");
     }).catch(function (err) {
