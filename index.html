@@ -78,11 +78,27 @@
   [hidden] { display: none !important; }
 
   .map-hint {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: 54px; left: 50%; transform: translateX(-50%);
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
     padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; color: var(--ink-soft);
     z-index: 500; pointer-events: none;
+    max-width: calc(100% - 120px); text-align: center;
   }
+  .map-filter-row {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 500; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+    max-width: calc(100% - 120px);
+  }
+  .map-filter-chip {
+    background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 5px 12px; border-radius: 999px; font-size: 0.76rem; font-weight: 600;
+    color: var(--ink-faint); cursor: pointer; white-space: nowrap;
+  }
+  .map-filter-chip.active { color: #fff; border-color: transparent; }
+  .map-filter-chip.active[data-type="spot"] { background: var(--accent); }
+  .map-filter-chip.active[data-type="catch"] { background: var(--catch); color: #241800; }
+  .map-filter-chip.active[data-type="parking"] { background: var(--parking); }
+  .map-filter-chip.active[data-type="access"] { background: var(--access); }
 
   .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
   .filter-row input[type="search"] { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; color: var(--ink); font-size: 0.9rem; }
@@ -198,6 +214,12 @@
   <main>
     <div id="mapPane">
       <div id="map"></div>
+      <div class="map-filter-row" id="mapFilterRow">
+        <button type="button" class="map-filter-chip active" data-type="spot">Spots</button>
+        <button type="button" class="map-filter-chip active" data-type="catch">F&auml;nge</button>
+        <button type="button" class="map-filter-chip active" data-type="parking">Parken</button>
+        <button type="button" class="map-filter-chip active" data-type="access">Zugang</button>
+      </div>
       <div class="map-hint">Tippen zum Anlegen &middot; Ziehen zum Bewegen &middot; Pinch/Scroll zum Zoomen</div>
     </div>
     <div id="listPane" hidden>
@@ -370,6 +392,7 @@
   var markers = {};
   var markerLayer = L.layerGroup().addTo(map);
   var ghostMarker = null;
+  var mapTypeFilter = { spot: true, catch: true, parking: true, access: true };
 
   var FISH_ICON_SRC = "icons/fisch-icon-transparent.png";
   var FISH_IMG_TAG = '<img src="' + FISH_ICON_SRC + '" alt="" />';
@@ -402,11 +425,21 @@
     markerLayer.clearLayers();
     markers = {};
     state.entries.forEach(function (e) {
+      if (!mapTypeFilter[e.type]) return;
       var m = L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
       m.bindPopup(popupHtml(e), { closeButton: true, maxWidth: 280 });
       markers[e.id] = m;
     });
   }
+
+  document.querySelectorAll(".map-filter-chip").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var type = chip.getAttribute("data-type");
+      mapTypeFilter[type] = !mapTypeFilter[type];
+      chip.classList.toggle("active", mapTypeFilter[type]);
+      rebuildMarkers();
+    });
+  });
 
   function fitToAllEntries() {
     if (!state.entries.length) { map.setView([56, 11], 5); return; }
