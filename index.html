@@ -60,6 +60,8 @@
   .topbar-title { display: flex; align-items: baseline; gap: 10px; }
   .topbar-title h1 { font-size: 1.3rem; margin: 0; color: #F3FBFA; }
   .topbar-sub { font-size: 0.68rem; color: #AEE0E2; letter-spacing: 0.06em; text-transform: uppercase; }
+  .profile-avatar { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 0.7rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-family: "Source Sans 3", sans-serif; padding: 0; flex: 0 0 auto; }
+  .field input:disabled { opacity: 0.6; }
   .stats { display: flex; gap: 8px; overflow-x: auto; }
   .stat-chip { flex: 0 0 auto; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 4px 10px; }
   .stat-chip .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 0.95rem; color: #F3FBFA; display: block; }
@@ -164,6 +166,7 @@
     <h1>Meerforellen&#8209;Log</h1>
     <div class="auth-sub" id="authSub">Mit E-Mail anmelden</div>
     <div class="auth-error" id="authError"></div>
+    <div class="field" id="authNameField" hidden><label for="auth_name">Name</label><input id="auth_name" type="text" autocomplete="name" placeholder="Wie sollen wir dich nennen?" /></div>
     <div class="field"><label for="auth_email">E-Mail</label><input id="auth_email" type="email" autocomplete="email" /></div>
     <div class="field"><label for="auth_pass">Passwort</label><input id="auth_pass" type="password" autocomplete="current-password" /></div>
     <div class="sheet-actions">
@@ -180,7 +183,7 @@
     <div class="topbar-title">
       <h1>Meerforellen&#8209;Log</h1>
       <span class="topbar-sub" id="viewerNote">&hellip;</span>
-      <button type="button" id="signOutBtn" style="background:none;border:none;color:#AEE0E2;font-size:0.68rem;text-decoration:underline;cursor:pointer;padding:0;">Abmelden</button>
+      <button type="button" id="profileBtn" class="profile-avatar" aria-label="Profil">?</button>
     </div>
     <div class="stats" id="statsRow"></div>
   </header>
@@ -677,7 +680,7 @@
       promise = db.collection("entries").doc(state.editingId).update(data);
     } else {
       data.createdAt = new Date().toISOString();
-      data.createdBy = auth.currentUser ? auth.currentUser.email : null;
+      data.createdBy = auth.currentUser ? (auth.currentUser.displayName || auth.currentUser.email) : null;
       promise = db.collection("entries").add(data);
     }
     promise.then(function () {
@@ -709,6 +712,8 @@
   var authScreenEl = document.getElementById("authScreen");
   var authSubEl = document.getElementById("authSub");
   var authErrorEl = document.getElementById("authError");
+  var authNameField = document.getElementById("authNameField");
+  var authNameEl = document.getElementById("auth_name");
   var authEmailEl = document.getElementById("auth_email");
   var authPassEl = document.getElementById("auth_pass");
   var authSubmitBtn = document.getElementById("authSubmitBtn");
@@ -726,6 +731,7 @@
   function setAuthMode(mode) {
     authMode = mode;
     clearAuthError();
+    authNameField.hidden = mode !== "signup";
     if (mode === "signin") {
       authSubEl.textContent = "Mit E-Mail anmelden";
       authSubmitBtn.textContent = "Anmelden";
@@ -757,13 +763,19 @@
     clearAuthError();
     var email = authEmailEl.value.trim();
     var pass = authPassEl.value;
+    var name = authNameEl.value.trim();
     if (!email || !pass) { showAuthError("Bitte E-Mail und Passwort eingeben."); return; }
+    if (authMode === "signup" && !name) { showAuthError("Bitte deinen Namen eingeben."); return; }
     authSubmitBtn.disabled = true;
     var original = authSubmitBtn.textContent;
     authSubmitBtn.textContent = "Bitte warten …";
     var action = authMode === "signin"
       ? auth.signInWithEmailAndPassword(email, pass)
-      : auth.createUserWithEmailAndPassword(email, pass);
+      : auth.createUserWithEmailAndPassword(email, pass).then(function (cred) {
+          return cred.user.updateProfile({ displayName: name }).then(function () {
+            updateProfileBadge(cred.user);
+          });
+        });
     action.catch(function (err) {
       showAuthError(authErrorMessage(err));
     }).finally(function () {
@@ -772,14 +784,61 @@
     });
   });
 
-  document.getElementById("signOutBtn").addEventListener("click", function () { auth.signOut(); });
+  // ---- profile sheet ----
+  function initialsFor(user) {
+    var base = (user.displayName || user.email || "?").trim();
+    return base.charAt(0).toUpperCase();
+  }
+
+  function openProfileSheet() {
+    var user = auth.currentUser;
+    if (!user) return;
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="profileBackdrop"><div class="sheet">' +
+        '<h2>Profil</h2>' +
+        '<div class="field"><label for="p_name">Name</label><input id="p_name" type="text" value="' + escapeHtml(user.displayName || "") + '" /></div>' +
+        '<div class="field"><label for="p_email">E-Mail</label><input id="p_email" type="text" value="' + escapeHtml(user.email || "") + '" disabled /></div>' +
+        '<div class="sheet-actions">' +
+          '<button type="button" class="btn-secondary" id="profileCloseBtn">Schließen</button>' +
+          '<button type="button" class="btn-primary" id="profileSaveBtn">Speichern</button>' +
+        "</div>" +
+        '<button type="button" class="btn-secondary" id="profileSignOutBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Abmelden</button>' +
+      "</div></div>");
+    var backdrop = document.getElementById("profileBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("profileCloseBtn").addEventListener("click", close);
+    document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
+    document.getElementById("profileSaveBtn").addEventListener("click", function () {
+      var newName = document.getElementById("p_name").value.trim();
+      if (!newName) { showToast("Bitte einen Namen eingeben"); return; }
+      var btn = document.getElementById("profileSaveBtn");
+      btn.disabled = true;
+      btn.textContent = "Speichert …";
+      user.updateProfile({ displayName: newName }).then(function () {
+        updateProfileBadge(user);
+        showToast("Gespeichert");
+        close();
+      }).catch(function () {
+        btn.disabled = false;
+        btn.textContent = "Speichern";
+        showToast("Fehler beim Speichern");
+      });
+    });
+  }
+  document.getElementById("profileBtn").addEventListener("click", openProfileSheet);
+
+  function updateProfileBadge(user) {
+    document.getElementById("viewerNote").textContent = user.displayName || user.email;
+    document.getElementById("profileBtn").textContent = initialsFor(user);
+  }
 
   auth.onAuthStateChanged(function (user) {
     authLoadingEl.hidden = true;
     if (user) {
       authScreenEl.hidden = true;
       appEl.hidden = false;
-      document.getElementById("viewerNote").textContent = user.email;
+      updateProfileBadge(user);
       subscribeEntries();
     } else {
       appEl.hidden = true;
