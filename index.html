@@ -116,11 +116,11 @@
   .pin-icon.spot .dot { background: var(--accent); }
   .pin-icon.parking .dot { background: var(--parking); }
   .pin-icon.access .dot { background: var(--access); }
-  .pin-icon.fish { width: 30px; height: 20px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
-  .pin-icon.fish .fish-body { fill: var(--catch); stroke: #fff; stroke-width: 1; }
-  .pin-icon.fish .fish-eye { fill: #fff; }
-  .pin-icon.fish.unlanded .fish-body { fill: var(--surface); stroke: var(--catch); stroke-width: 1.6; stroke-dasharray: 2.2 1.8; }
-  .pin-icon.fish.unlanded .fish-eye { fill: var(--catch); }
+  .pin-icon.fish { width: 38px; height: 22px; display: flex; align-items: center; justify-content: center; }
+  .pin-icon.fish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
+  .pin-icon.fish.unlanded img { opacity: 0.5; filter: grayscale(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+  .badge-fish-img { width: 22px; height: 22px; object-fit: contain; }
+  .badge.catch.unlanded .badge-fish-img { opacity: 0.55; filter: grayscale(0.8); }
   .leaflet-popup-content-wrapper { border-radius: var(--radius); background: var(--surface); color: var(--ink); }
   .leaflet-popup-content { margin: 10px 12px; min-width: 220px; }
   .leaflet-popup-tip { background: var(--surface); }
@@ -311,7 +311,7 @@
     return '' +
       '<div class="card" data-id="' + e.id + '">' +
         '<div class="card-top">' +
-          '<div class="badge ' + e.type + (e.type === "catch" && e.landed === false ? " unlanded" : "") + '">' + TYPE_ICON[e.type] + "</div>" +
+          '<div class="badge ' + e.type + (e.type === "catch" && e.landed === false ? " unlanded" : "") + '">' + (e.type === "catch" ? '<img class="badge-fish-img" src="' + FISH_ICON_SRC + '" alt="" />' : TYPE_ICON[e.type]) + "</div>" +
           '<div class="card-body">' +
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
@@ -371,20 +371,18 @@
   var markerLayer = L.layerGroup().addTo(map);
   var ghostMarker = null;
 
-  var FISH_SVG = '<svg viewBox="0 0 32 20" width="26" height="16">' +
-    '<path class="fish-body" d="M2 10 C2 5 9 2 16 2 C21 2 24 4 28 1 L24 10 L28 19 C24 16 21 18 16 18 C9 18 2 15 2 10 Z" />' +
-    '<circle class="fish-eye" cx="7" cy="8" r="1.4" />' +
-    "</svg>";
+  var FISH_ICON_SRC = "icons/fisch-icon-transparent.png";
+  var FISH_IMG_TAG = '<img src="' + FISH_ICON_SRC + '" alt="" />';
 
   function makeIcon(e) {
     if (e.type === "catch") {
       var landed = e.landed !== false;
       return L.divIcon({
         className: "",
-        html: '<div class="pin-icon fish' + (landed ? "" : " unlanded") + '">' + FISH_SVG + "</div>",
-        iconSize: [30, 20],
-        iconAnchor: [15, 10],
-        popupAnchor: [0, -8]
+        html: '<div class="pin-icon fish' + (landed ? "" : " unlanded") + '">' + FISH_IMG_TAG + "</div>",
+        iconSize: [38, 22],
+        iconAnchor: [19, 11],
+        popupAnchor: [0, -10]
       });
     }
     return L.divIcon({
