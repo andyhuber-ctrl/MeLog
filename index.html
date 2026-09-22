@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meerforellen-Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #E9F1EF; --surface: #FFFFFF; --surface-2: #F2F7F6;
+    --ink: #10262A; --ink-soft: #4C6B6E; --ink-faint: #7E9A9C; --border: #C7DCD9;
+    --accent: #0E6E7A; --accent-strong: #084A52; --accent-wash: #DCEEEE;
+    --catch: #B9781A; --catch-wash: #F7EAD3;
+    --parking: #5D6E80; --parking-wash: #E7ECF1;
+    --access: #7A5D9E; --access-wash: #EEE7F5;
+    --danger: #B0392E;
+    --shadow: 0 8px 24px -12px rgba(8, 40, 44, 0.28);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0A1A1D; --surface: #102428; --surface-2: #0D1F22;
+      --ink: #E6F2F1; --ink-soft: #9FBCBC; --ink-faint: #6D8D8E; --border: #1E3C40;
+      --accent: #4FC6D1; --accent-strong: #8CE0E8; --accent-wash: #123338;
+      --catch: #E3A63D; --catch-wash: #33270F;
+      --parking: #9FB1C2; --parking-wash: #1B2530;
+      --access: #C6ACE8; --access-wash: #251C33;
+      --danger: #E2685C;
+      --shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.55);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Source Sans 3", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  h1, h2, .display { font-family: "Big Shoulders Display", system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.02em; font-weight: 700; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; }
+  button { font-family: inherit; }
+
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  header.topbar {
+    flex: 0 0 auto; z-index: 20;
+    background: var(--accent-strong); color: #F3FBFA;
+    padding: 10px 16px; box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .topbar-title { display: flex; align-items: baseline; gap: 10px; }
+  .topbar-title h1 { font-size: 1.3rem; margin: 0; color: #F3FBFA; }
+  .topbar-sub { font-size: 0.68rem; color: #AEE0E2; letter-spacing: 0.06em; text-transform: uppercase; }
+  .stats { display: flex; gap: 8px; overflow-x: auto; }
+  .stat-chip { flex: 0 0 auto; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 4px 10px; }
+  .stat-chip .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 0.95rem; color: #F3FBFA; display: block; }
+  .stat-chip .lbl { font-size: 0.6rem; color: #AEE0E2; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  nav.tabs { flex: 0 0 auto; display: flex; gap: 6px; background: var(--surface); padding: 8px 16px; border-bottom: 1px solid var(--border); }
+  .tab-btn { border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); padding: 6px 14px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .tab-btn[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  main { flex: 1; min-height: 0; position: relative; }
+  #mapPane { position: absolute; inset: 0; }
+  #map { width: 100%; height: 100%; background: var(--surface-2); }
+  #listPane { position: absolute; inset: 0; overflow-y: auto; padding: 12px 16px 90px; background: var(--bg); }
+  [hidden] { display: none !important; }
+
+  .map-hint {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; color: var(--ink-soft);
+    z-index: 500; pointer-events: none;
+  }
+
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filter-row input[type="search"] { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; color: var(--ink); font-size: 0.9rem; }
+
+  .card-list { display: flex; flex-direction: column; gap: 8px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .card-top { display: flex; align-items: flex-start; gap: 10px; }
+  .badge { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+  .badge.spot { background: var(--accent-wash); color: var(--accent); }
+  .badge.catch { background: var(--catch-wash); color: var(--catch); }
+  .badge.catch.unlanded { background: transparent; border: 1.5px dashed var(--catch); }
+  .badge.parking { background: var(--parking-wash); color: var(--parking); }
+  .badge.access { background: var(--access-wash); color: var(--access); }
+  .card-body { flex: 1; min-width: 0; }
+  .card-title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card-title { font-weight: 700; }
+  .card-meta { font-size: 0.76rem; color: var(--ink-soft); }
+  .card-stat { font-family: "JetBrains Mono", monospace; font-weight: 700; color: var(--catch); }
+  .card-notes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tag { font-size: 0.72rem; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-soft); padding: 2px 8px; border-radius: 999px; }
+  .card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .card-actions a, .card-actions button { font-size: 0.78rem; text-decoration: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+  .card-actions .danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  .empty-state { text-align: center; padding: 40px 16px; color: var(--ink-faint); }
+
+  .fab { position: fixed; right: 18px; bottom: 22px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
+
+  .pin-icon { width: 30px; height: 30px; position: relative; }
+  .pin-icon .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); }
+  .pin-icon.spot .dot { background: var(--accent); }
+  .pin-icon.parking .dot { background: var(--parking); }
+  .pin-icon.access .dot { background: var(--access); }
+  .pin-icon.fish { width: 30px; height: 20px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
+  .pin-icon.fish .fish-body { fill: var(--catch); stroke: #fff; stroke-width: 1; }
+  .pin-icon.fish .fish-eye { fill: #fff; }
+  .pin-icon.fish.unlanded .fish-body { fill: var(--surface); stroke: var(--catch); stroke-width: 1.6; stroke-dasharray: 2.2 1.8; }
+  .pin-icon.fish.unlanded .fish-eye { fill: var(--catch); }
+  .leaflet-popup-content-wrapper { border-radius: var(--radius); background: var(--surface); color: var(--ink); }
+  .leaflet-popup-content { margin: 10px 12px; min-width: 220px; }
+  .leaflet-popup-tip { background: var(--surface); }
+
+  .sheet-backdrop { position: fixed; inset: 0; background: rgba(6,20,22,0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 520px; max-height: min(88vh, 720px); overflow-y: auto; background: var(--surface); border-radius: 18px 18px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow: var(--shadow); }
+  .sheet h2 { margin: 0 0 12px; font-size: 1.2rem; }
+  .type-picker { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .type-opt { border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); padding: 7px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  .type-opt[aria-pressed="true"].spot { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .type-opt[aria-pressed="true"].catch { background: var(--catch); border-color: var(--catch); color: #241800; }
+  .type-opt[aria-pressed="true"].parking { background: var(--parking); border-color: var(--parking); color: #fff; }
+  .type-opt[aria-pressed="true"].access { background: var(--access); border-color: var(--access); color: #fff; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; color: var(--ink); font-size: 0.95rem; font-family: inherit; }
+  .field textarea { min-height: 60px; resize: vertical; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; min-width: 0; }
+  .form-hint { font-size: 0.74rem; color: var(--ink-faint); margin: -6px 0 12px; }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .btn-primary, .btn-secondary { flex: 1; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 0.95rem; border: none; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border); }
+  .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 999px; font-size: 0.85rem; z-index: 1100; box-shadow: var(--shadow); }
+
+  .auth-screen { position: fixed; inset: 0; z-index: 2000; background: var(--accent-strong); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-box { width: 100%; max-width: 380px; background: var(--surface); border-radius: 18px; padding: 28px 24px; box-shadow: var(--shadow); }
+  .auth-box h1 { font-size: 1.5rem; margin: 0 0 4px; color: var(--ink); }
+  .auth-sub { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 20px; }
+  .auth-error { font-size: 0.82rem; color: var(--danger); background: var(--access-wash); border: 1px solid var(--danger); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; display: none; }
+  .auth-error.show { display: block; }
+  .auth-mode-switch { text-align: center; font-size: 0.85rem; color: var(--ink-soft); margin-top: 14px; }
+  .auth-mode-switch button { background: none; border: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 0; font-size: inherit; }
+  .auth-loading { position: fixed; inset: 0; z-index: 2000; background: var(--accent-strong); display: flex; align-items: center; justify-content: center; color: #fff; font-family: "Big Shoulders Display", sans-serif; text-transform: uppercase; letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+<div class="auth-loading" id="authLoading">L&auml;dt &hellip;</div>
+
+<div class="auth-screen" id="authScreen" hidden>
+  <div class="auth-box">
+    <h1>Meerforellen&#8209;Log</h1>
+    <div class="auth-sub" id="authSub">Mit E-Mail anmelden</div>
+    <div class="auth-error" id="authError"></div>
+    <div class="field"><label for="auth_email">E-Mail</label><input id="auth_email" type="email" autocomplete="email" /></div>
+    <div class="field"><label for="auth_pass">Passwort</label><input id="auth_pass" type="password" autocomplete="current-password" /></div>
+    <div class="sheet-actions">
+      <button type="button" class="btn-primary" id="authSubmitBtn" style="flex:1">Anmelden</button>
+    </div>
+    <div class="auth-mode-switch" id="authModeSwitch">
+      Noch kein Konto? <button type="button" id="authModeToggle">Registrieren</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>Meerforellen&#8209;Log</h1>
+      <span class="topbar-sub" id="viewerNote">&hellip;</span>
+      <button type="button" id="signOutBtn" style="background:none;border:none;color:#AEE0E2;font-size:0.68rem;text-decoration:underline;cursor:pointer;padding:0;">Abmelden</button>
+    </div>
+    <div class="stats" id="statsRow"></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn" data-tab="map" role="tab" aria-selected="true">Karte</button>
+    <button class="tab-btn" data-tab="catch" role="tab" aria-selected="false">F&auml;nge</button>
+    <button class="tab-btn" data-tab="spot" role="tab" aria-selected="false">Spots</button>
+    <button class="tab-btn" data-tab="parking" role="tab" aria-selected="false">Parken &amp; Zugang</button>
+  </nav>
+
+  <main>
+    <div id="mapPane">
+      <div id="map"></div>
+      <div class="map-hint">Tippen zum Anlegen &middot; Ziehen zum Bewegen &middot; Pinch/Scroll zum Zoomen</div>
+    </div>
+    <div id="listPane" hidden>
+      <div class="filter-row">
+        <input type="search" id="searchInput" placeholder="Suche nach Name, Notiz, K&ouml;der &hellip;" />
+      </div>
+      <div id="listRoot"></div>
+    </div>
+  </main>
+
+  <button class="fab" id="fabAdd" aria-label="Neuer Eintrag">+</button>
+</div>
+
+<script id="seed-data" type="application/json">[{"type":"spot","name":"Hotspot","lat":56.695093,"lng":12.678922,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import000"},{"type":"spot","name":"Hotspot","lat":68.394518,"lng":14.555984,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import001"},{"type":"spot","name":"Spot","lat":54.560917,"lng":11.963519,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import002"},{"type":"spot","name":"Hotspot","lat":68.794998,"lng":15.469641,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import003"},{"type":"spot","name":"Hotspot","lat":68.976579,"lng":15.651133,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import004"},{"type":"spot","name":"Spot","lat":61.106108,"lng":7.449406,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import005"},{"type":"spot","name":"Spot","lat":69.876029,"lng":21.195183,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import006"},{"type":"spot","name":"P Spot","lat":54.677294,"lng":13.438936,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import007"},{"type":"spot","name":"P Spot","lat":54.656593,"lng":13.422502,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import008"},{"type":"spot","name":"Borager","lat":54.864763,"lng":9.750322,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import009"},{"type":"spot","name":"Spot","lat":55.109773,"lng":9.513759,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import010"},{"type":"spot","name":"Spot","lat":55.104277,"lng":9.526695,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import011"},{"type":"spot","name":"Spot","lat":55.087544,"lng":10.120883,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import012"},{"type":"spot","name":"Spot","lat":55.075666,"lng":10.0768,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import013"},{"type":"spot","name":"Spot","lat":55.059212,"lng":10.207474,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import014"},{"type":"parking","name":"Parken","lat":55.066787,"lng":10.198444,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import015"},{"type":"parking","name":"Parken","lat":55.097276,"lng":10.079907,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import016"},{"type":"parking","name":"Parken","lat":55.517693,"lng":9.654627,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import017"},{"type":"spot","name":"Spot","lat":55.511791,"lng":9.647465,"notes":"Sehr flacher und stark bewachsener Bereich. Erwärmt sich im Frühjahr früh.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import018"},{"type":"spot","name":"Spot","lat":55.509001,"lng":9.640377,"notes":"Abfallende Kante mit starker Strömung möglich.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import019"},{"type":"spot","name":"Spot","lat":55.476852,"lng":10.747418,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import020"},{"type":"parking","name":"Parken","lat":55.106853,"lng":10.091762,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import021"},{"type":"spot","name":"Faldsled Auslauf","lat":55.153567,"lng":10.140797,"notes":"Sehr guter Winterplatz nahe Süßwassereinlauf.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import022"},{"type":"parking","name":"Parken","lat":55.166123,"lng":10.133693,"notes":"Zufahrt zum Parkplatz nur vom 01.05.-30.09. erlaubt.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import023"},{"type":"parking","name":"Parken","lat":55.12191,"lng":10.155096,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import024"},{"type":"parking","name":"Parken","lat":55.152912,"lng":10.145557,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import025"},{"type":"spot","name":"Spot","lat":55.286066,"lng":10.822607,"notes":"Unscheinbar, kann aber auch im Winter Erfolg bringen","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import026"},{"type":"parking","name":"Parken","lat":55.287219,"lng":10.826316,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import027"},{"type":"spot","name":"Spot","lat":55.125645,"lng":10.164204,"notes":"Empfehlung: Winterspot am Süßwassereinlauf. Achtung Schutzzone beachten.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import028"},{"type":"spot","name":"Spot","lat":55.121436,"lng":10.146303,"notes":"Empfehlung: Winterspot am Süßwassereinlauf. Achtung Schutzzone beachten.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import029"},{"type":"spot","name":"Schutzzone","lat":55.128385,"lng":10.174605,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import030"},{"type":"spot","name":"Süßwassereinlauf","lat":55.190042,"lng":10.106578,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import031"},{"type":"spot","name":"Süßwassereinlauf","lat":55.162926,"lng":10.134418,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import032"},{"type":"spot","name":"Faldsled Landzunge","lat":55.15161,"lng":10.139245,"notes":"Landzunge mit langen Auslauf.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import033"},{"type":"spot","name":"Süßwasserauslauf","lat":55.153558,"lng":10.14343,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import034"},{"type":"spot","name":"Süßwassereinlauf","lat":55.12654,"lng":10.77838,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import035"},{"type":"spot","name":"Spot","lat":55.101188,"lng":10.775747,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import036"},{"type":"spot","name":"Hotspot","lat":68.39454,"lng":14.555351,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import037"},{"type":"parking","name":"Park&Camp","lat":68.410008,"lng":14.706591,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import038"},{"type":"parking","name":"Park&Camp","lat":68.410382,"lng":14.705899,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import039"},{"type":"spot","name":"Spot","lat":68.410064,"lng":14.703773,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import040"},{"type":"spot","name":"Spot","lat":55.056091,"lng":10.704285,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import041"},{"type":"spot","name":"Spot","lat":55.029167,"lng":10.718747,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import042"},{"type":"spot","name":"Spot","lat":55.195543,"lng":10.811477,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import043"},{"type":"catch","name":"MeFo 35+","lat":55.10408,"lng":10.774533,"notes":"35+ / Rinne / Fischimitat","source":"import","date":"2026-04-10","lengthCm":35,"countFish":1,"waterTempC":8,"wind":"Ost","salinityPct":"2.1","weather":"Sonne Wolken","createdAt":"2026-04-10T12:00:00.000Z","id":"import044"},{"type":"catch","name":"10 MeFos 35-40+","lat":55.101782,"lng":10.775741,"notes":"Bratpfannenfüller / 10 Meerforellen 35-40+ innerhalb von einer Stunde. / Zwischen 15.00 Uhr und 16.00 Uhr","source":"import","date":"2026-04-12","method":"Fliege","lengthMinCm":35,"lengthMaxCm":40,"countFish":10,"waterTempC":8,"wind":"leicht","salinityPct":"2","weather":"Sonnig,","createdAt":"2026-04-12T12:00:00.000Z","id":"import045"},{"type":"catch","name":"MeFo 40+","lat":55.102541,"lng":10.775521,"notes":"Sandaal","source":"import","method":"Spinnrute","lengthCm":40,"countFish":1,"createdAt":"2026-01-01T12:00:00.000Z","id":"import046"},{"type":"catch","name":"MeFo 40+","lat":55.101669,"lng":10.775716,"notes":"Bratpfannenfüller / 40+","source":"import","date":"2026-04-13","method":"Fliege","lengthCm":40,"countFish":1,"waterTempC":8,"wind":"mäßig","salinityPct":"2","weather":"Wolkig","createdAt":"2026-04-13T12:00:00.000Z","id":"import047"},{"type":"spot","name":"Süßwassereinlauf","lat":55.105887,"lng":10.772153,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import048"},{"type":"spot","name":"Spot","lat":55.09921,"lng":10.764707,"notes":"Viele Angler gesehen, bisher aber nicht dort gefischt.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import049"},{"type":"catch","name":"Catch","lat":55.097297,"lng":10.079255,"source":"import","countFish":1,"createdAt":"2026-01-01T12:00:00.000Z","id":"import050"},{"type":"spot","name":"Spot","lat":55.518595,"lng":9.690678,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import051"},{"type":"parking","name":"Parken","lat":55.350983,"lng":9.841455,"notes":"Super Parkplatz direkt am Strand. Übernachtung im Wohnmobil wird geduldet. Kostenlos. Toilette vorhanden.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import052"},{"type":"parking","name":"Parken","lat":55.038981,"lng":10.711954,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import053"},{"type":"parking","name":"Parken","lat":55.061694,"lng":10.713912,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import054"},{"type":"parking","name":"Parken","lat":55.165249,"lng":10.140126,"notes":"Parken in den Wintermonaten, wenn Zufahrt zum Strand verboten.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import055"},{"type":"parking","name":"Parken","lat":55.198177,"lng":10.808985,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import056"},{"type":"parking","name":"Parken","lat":55.505058,"lng":9.691097,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import057"},{"type":"parking","name":"Parken","lat":55.543799,"lng":9.768331,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import058"},{"type":"catch","name":"MeFo 20","lat":55.363168,"lng":9.783361,"notes":"Shrimp pink","source":"import","date":"2026-07-15","method":"Fliege","lengthCm":20,"countFish":1,"createdAt":"2026-07-15T12:00:00.000Z","id":"import059"},{"type":"catch","name":"MeFo 30","lat":55.355118,"lng":9.815198,"notes":"Topwater Käfer","source":"import","date":"2026-07-15","method":"Fliege","lengthCm":30,"countFish":1,"createdAt":"2026-07-15T12:00:00.000Z","id":"import060"},{"type":"catch","name":"MeFo 35","lat":55.363789,"lng":9.783121,"notes":"Sandaal","source":"import","date":"2026-07-14","method":"Spinnrute","lengthCm":35,"countFish":1,"createdAt":"2026-07-14T12:00:00.000Z","id":"import061"},{"type":"catch","name":"MeFo 40","lat":55.362825,"lng":9.782563,"notes":"Sandaal","source":"import","date":"2026-07-14","method":"Spinnrute","lengthCm":40,"countFish":1,"createdAt":"2026-07-14T12:00:00.000Z","id":"import062"},{"type":"catch","name":"MeFo 45","lat":55.354158,"lng":9.814516,"notes":"Sandaal","source":"import","date":"2026-07-15","method":"Spinnrute","lengthCm":45,"countFish":1,"createdAt":"2026-07-15T12:00:00.000Z","id":"import063"},{"type":"catch","name":"MeFo 53","lat":55.353911,"lng":9.814755,"notes":"Sandaal","source":"import","date":"2026-07-15","method":"Spinnrute","lengthCm":53,"countFish":1,"createdAt":"2026-07-15T12:00:00.000Z","id":"import064"},{"type":"catch","name":"MeFo 55","lat":55.360881,"lng":9.783319,"notes":"Sandaal","source":"import","date":"2026-07-14","method":"Spinnrute","lengthCm":55,"countFish":1,"createdAt":"2026-07-14T12:00:00.000Z","id":"import065"},{"type":"catch","name":"MeFo Drill","lat":55.335209,"lng":9.876284,"notes":"Biss nach kurzem Drill abgegangen. MeFo 30","source":"import","date":"2026-09-10","countFish":1,"createdAt":"2026-09-10T12:00:00.000Z","id":"import066","landed":false},{"type":"spot","name":"Süßwassereinlauf","lat":55.349148,"lng":9.873952,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import067"},{"type":"catch","name":"MeFo 52","lat":55.254028,"lng":9.872971,"notes":"Kupfer","source":"import","date":"2026-09-11","method":"Fliege","lengthCm":52,"countFish":1,"createdAt":"2026-09-11T12:00:00.000Z","id":"import068"},{"type":"catch","name":"MeFo 42","lat":55.253951,"lng":9.870424,"notes":"Pink Shrimp / Abgeschnittene Fettflosse -> Zucht","source":"import","date":"2026-09-11","method":"Fliege","lengthCm":42,"countFish":1,"createdAt":"2026-09-11T12:00:00.000Z","id":"import069"},{"type":"parking","name":"Parken","lat":55.244317,"lng":9.892843,"notes":"Mit den Camper stehen geduldet. Kostenfrei.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import070"},{"type":"parking","name":"Parken","lat":55.24907,"lng":9.898461,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import071"},{"type":"catch","name":"MeFo 53","lat":55.411013,"lng":9.78713,"source":"import","date":"2026-09-12","method":"Fliege","lengthCm":53,"countFish":1,"createdAt":"2026-09-12T12:00:00.000Z","id":"import072"},{"type":"catch","name":"MeFo 46","lat":55.411116,"lng":9.787556,"source":"import","date":"2026-09-12","method":"Fliege","lengthCm":46,"countFish":1,"createdAt":"2026-09-12T12:00:00.000Z","id":"import073"},{"type":"catch","name":"MeFo 50","lat":55.411122,"lng":9.787429,"source":"import","date":"2026-09-12","method":"Fliege","lengthCm":50,"countFish":1,"createdAt":"2026-09-12T12:00:00.000Z","id":"import074"},{"type":"catch","name":"MeFo 30+","lat":55.411028,"lng":9.787182,"source":"import","date":"2026-09-12","method":"Fliege","lengthCm":30,"countFish":1,"createdAt":"2026-09-12T12:00:00.000Z","id":"import075"},{"type":"catch","name":"MeFo 44","lat":55.409981,"lng":9.790836,"source":"import","date":"2026-09-12","method":"Fliege","lengthCm":44,"countFish":1,"createdAt":"2026-09-12T12:00:00.000Z","id":"import076"},{"type":"access","name":"Zugang","lat":55.410169,"lng":9.795605,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import077"},{"type":"access","name":"Zugang","lat":55.413639,"lng":9.803752,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import078"},{"type":"catch","name":"2 MeFo 25+","lat":55.254033,"lng":9.87268,"source":"import","date":"2026-09-12","method":"Fliege","lengthCm":25,"countFish":2,"createdAt":"2026-09-12T12:00:00.000Z","id":"import079"},{"type":"catch","name":"MeFo 30+","lat":55.244995,"lng":9.891014,"source":"import","date":"2026-09-12","method":"Fliege","lengthCm":30,"countFish":1,"createdAt":"2026-09-12T12:00:00.000Z","id":"import080"},{"type":"parking","name":"Parken","lat":55.334543,"lng":9.878109,"source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import081"},{"type":"parking","name":"Parken","lat":55.411194,"lng":9.803925,"notes":"Parkmöglichkeit für den Spot Ålehoved. Weiter vorne kommt noch eine Wendeplatte, dort ist das Parken allerdings nicht gestattet.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import082"},{"type":"catch","name":"MeFo 48","lat":55.36288,"lng":9.78712,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":48,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import083"},{"type":"catch","name":"MeFo 54","lat":55.363377,"lng":9.7847,"notes":"Fliege - Muster: Tangläufer / Strömung: leicht nordwärts","source":"import","date":"2026-09-13","lengthCm":54,"countFish":1,"wind":"7 Knoten W","weather":"Wetter: wolkig","createdAt":"2026-09-13T12:00:00.000Z","id":"import084"},{"type":"catch","name":"MeFo 45","lat":55.363634,"lng":9.781552,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":45,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import085"},{"type":"catch","name":"MeFo 49","lat":55.362376,"lng":9.785867,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":49,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import086"},{"type":"catch","name":"MeFo 50","lat":55.375365,"lng":9.789698,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":50,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import087"},{"type":"catch","name":"MeFo 43","lat":55.375609,"lng":9.791551,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":43,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import088"},{"type":"catch","name":"MeFo 35+","lat":55.355552,"lng":9.816579,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":35,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import089"},{"type":"catch","name":"MeFo 20+","lat":55.35682,"lng":9.811293,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":20,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import090"},{"type":"catch","name":"MeFo 20+","lat":55.356999,"lng":9.811669,"source":"import","date":"2026-09-13","method":"Fliege","lengthCm":20,"countFish":1,"createdAt":"2026-09-13T12:00:00.000Z","id":"import091"},{"type":"parking","name":"Parken","lat":55.364701,"lng":9.83696,"notes":"Parkplatz als Ausgangspunkt für alle Spot in Wedellsborg. Achtung: Nicht weiter auf die Halbinsel fahren, da verboten und videoüberwacht.","source":"import","createdAt":"2026-01-01T12:00:00.000Z","id":"import092"}]</script>
+<script>
+(function () {
+  "use strict";
+
+  var TYPE_LABEL = { spot: "Spot", catch: "Fang", parking: "Parken", access: "Zugang" };
+  var TYPE_ICON = { spot: "⊙", catch: "🐟", parking: "P", access: "→" };
+
+  // TODO: durch die echte firebaseConfig aus der Firebase-Konsole ersetzen
+  // (Projekteinstellungen -> Allgemein -> Meine Apps -> Web-App).
+  var firebaseConfig = {
+    apiKey: "TODO_API_KEY",
+    authDomain: "TODO_PROJECT.firebaseapp.com",
+    projectId: "TODO_PROJECT",
+    storageBucket: "TODO_PROJECT.appspot.com",
+    messagingSenderId: "TODO_SENDER_ID",
+    appId: "TODO_APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+
+  var state = {
+    entries: [],
+    tab: "map",
+    search: "",
+    editingId: null
+  };
+  var unsubscribeEntries = null;
+  var firstSnapshotHandled = false;
+  var seedingInProgress = false;
+
+  var listRoot = document.getElementById("listRoot");
+  var statsRow = document.getElementById("statsRow");
+  var searchInput = document.getElementById("searchInput");
+
+  function escapeHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var p = iso.split("-");
+    return p.length === 3 ? p[2] + "." + p[1] + "." + p[0] : iso;
+  }
+  function mapsLinks(lat, lng, name) {
+    var q = encodeURIComponent(name || "Spot");
+    return {
+      apple: "https://maps.apple.com/?ll=" + lat + "," + lng + "&q=" + q,
+      google: "https://www.google.com/maps?q=" + lat + "," + lng
+    };
+  }
+
+  function renderStats() {
+    var catches = state.entries.filter(function (e) { return e.type === "catch"; });
+    var landedCatches = catches.filter(function (e) { return e.landed !== false; });
+    var bites = catches.length - landedCatches.length;
+    var totalFish = landedCatches.reduce(function (s, e) { return s + (e.countFish || 1); }, 0);
+    var lengths = [];
+    landedCatches.forEach(function (e) { if (e.lengthCm) lengths.push(e.lengthCm); if (e.lengthMaxCm) lengths.push(e.lengthMaxCm); });
+    var biggest = lengths.length ? Math.max.apply(null, lengths) : null;
+    var spots = state.entries.filter(function (e) { return e.type === "spot"; }).length;
+    var chips = [
+      { val: totalFish, lbl: "Fische" },
+      { val: biggest ? biggest + " cm" : "–", lbl: "Größte" },
+      { val: bites, lbl: "Bisse" },
+      { val: spots, lbl: "Spots" },
+      { val: state.entries.length, lbl: "Gesamt" }
+    ];
+    statsRow.innerHTML = chips.map(function (c) {
+      return '<div class="stat-chip"><span class="val mono">' + c.val + '</span><span class="lbl">' + c.lbl + '</span></div>';
+    }).join("");
+  }
+
+  function cardTags(e) {
+    var tags = [];
+    if (e.type === "catch" && e.landed === false) tags.push("Nur Biss – nicht gelandet");
+    if (e.method) tags.push(e.method);
+    if (e.waterTempC != null) tags.push(e.waterTempC + "° Wasser");
+    if (e.wind) tags.push("Wind " + e.wind);
+    if (e.salinityPct) tags.push(e.salinityPct + "% Salz");
+    if (e.weather) tags.push(e.weather);
+    return tags;
+  }
+
+  function cardHtml(e) {
+    var links = mapsLinks(e.lat, e.lng, e.name);
+    var statLine = "";
+    if (e.type === "catch") {
+      if (e.lengthMinCm && e.lengthMaxCm) statLine = e.lengthMinCm + "–" + e.lengthMaxCm + " cm";
+      else if (e.lengthCm) statLine = e.lengthCm + "+ cm";
+      if (e.countFish && e.countFish > 1) statLine = e.countFish + "× " + statLine;
+    }
+    var tags = cardTags(e);
+    var metaBits = [];
+    if (e.type === "catch" && e.date) metaBits.push(fmtDate(e.date));
+    metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
+    if (e.createdBy) metaBits.push(e.createdBy);
+    return '' +
+      '<div class="card" data-id="' + e.id + '">' +
+        '<div class="card-top">' +
+          '<div class="badge ' + e.type + (e.type === "catch" && e.landed === false ? " unlanded" : "") + '">' + TYPE_ICON[e.type] + "</div>" +
+          '<div class="card-body">' +
+            '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
+              (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
+            '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" +
+            (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
+            (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
+            '<div class="card-actions">' +
+              '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a>' +
+              '<a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' +
+              '<button type="button" class="locate-on-map">Auf Karte</button>' +
+              '<button type="button" class="edit-btn">Bearbeiten</button>' +
+              '<button type="button" class="danger delete-btn">Löschen</button>' +
+            "</div>" +
+          "</div>" +
+        "</div>" +
+      "</div>";
+  }
+
+  function renderList() {
+    var filtered = state.entries.filter(function (e) {
+      if (state.tab === "parking") { if (e.type !== "parking" && e.type !== "access") return false; }
+      else if (e.type !== state.tab) return false;
+      if (state.search) {
+        var hay = [e.name, e.notes, e.method, e.wind, e.weather].join(" ").toLowerCase();
+        if (hay.indexOf(state.search.toLowerCase()) === -1) return false;
+      }
+      return true;
+    });
+    filtered.sort(function (a, b) {
+      var da = a.date || a.createdAt || "", db_ = b.date || b.createdAt || "";
+      return da < db_ ? 1 : da > db_ ? -1 : 0;
+    });
+    listRoot.innerHTML = filtered.length
+      ? '<div class="card-list">' + filtered.map(cardHtml).join("") + "</div>"
+      : '<div class="empty-state">Noch nichts hier. Tippe auf + um einen Eintrag hinzuzufügen.</div>';
+  }
+
+  // ---- Leaflet map ----
+  var map = L.map("map", { zoomControl: true, attributionControl: true });
+
+  var streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a> contributors"
+  }).addTo(map);
+
+  var satelliteLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19,
+    attribution: "Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics, GIS User Community"
+  });
+
+  L.control.layers({
+    "Straßenkarte": streetLayer,
+    "Satellit": satelliteLayer
+  }, null, { position: "topright", collapsed: true }).addTo(map);
+
+  var markers = {};
+  var markerLayer = L.layerGroup().addTo(map);
+  var ghostMarker = null;
+
+  var FISH_SVG = '<svg viewBox="0 0 32 20" width="26" height="16">' +
+    '<path class="fish-body" d="M2 10 C2 5 9 2 16 2 C21 2 24 4 28 1 L24 10 L28 19 C24 16 21 18 16 18 C9 18 2 15 2 10 Z" />' +
+    '<circle class="fish-eye" cx="7" cy="8" r="1.4" />' +
+    "</svg>";
+
+  function makeIcon(e) {
+    if (e.type === "catch") {
+      var landed = e.landed !== false;
+      return L.divIcon({
+        className: "",
+        html: '<div class="pin-icon fish' + (landed ? "" : " unlanded") + '">' + FISH_SVG + "</div>",
+        iconSize: [30, 20],
+        iconAnchor: [15, 10],
+        popupAnchor: [0, -8]
+      });
+    }
+    return L.divIcon({
+      className: "",
+      html: '<div class="pin-icon ' + e.type + '"><div class="dot"></div></div>',
+      iconSize: [30, 30],
+      iconAnchor: [15, 28],
+      popupAnchor: [0, -26]
+    });
+  }
+
+  function popupHtml(e) {
+    return cardHtml(e);
+  }
+
+  function rebuildMarkers() {
+    markerLayer.clearLayers();
+    markers = {};
+    state.entries.forEach(function (e) {
+      var m = L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
+      m.bindPopup(popupHtml(e), { closeButton: true, maxWidth: 280 });
+      markers[e.id] = m;
+    });
+  }
+
+  function fitToAllEntries() {
+    if (!state.entries.length) { map.setView([56, 11], 5); return; }
+    var bounds = L.latLngBounds(state.entries.map(function (e) { return [e.lat, e.lng]; }));
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+  }
+
+  function seedIfEmpty() {
+    if (seedingInProgress) return;
+    seedingInProgress = true;
+    db.collection("entries").limit(1).get().then(function (snap) {
+      if (!snap.empty) return;
+      var seed = JSON.parse(document.getElementById("seed-data").textContent);
+      var batch = db.batch();
+      seed.forEach(function (e) {
+        var data = Object.assign({}, e);
+        delete data.id;
+        batch.set(db.collection("entries").doc(e.id), data);
+      });
+      return batch.commit();
+    }).catch(function (err) {
+      console.error("Seed fehlgeschlagen", err);
+    }).finally(function () {
+      seedingInProgress = false;
+    });
+  }
+
+  function subscribeEntries() {
+    firstSnapshotHandled = false;
+    if (unsubscribeEntries) unsubscribeEntries();
+    unsubscribeEntries = db.collection("entries").onSnapshot(function (snap) {
+      var docs = [];
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        d.id = doc.id;
+        docs.push(d);
+      });
+      state.entries = docs;
+      if (!docs.length) seedIfEmpty();
+      rebuildMarkers();
+      if (!firstSnapshotHandled) { fitToAllEntries(); firstSnapshotHandled = true; }
+      renderStats();
+      renderList();
+    }, function (err) {
+      console.error("Firestore-Fehler", err);
+      showAuthError(err.code === "permission-denied"
+        ? "Diese E-Mail hat noch keinen Zugriff. Bitte Andy um Freischaltung bitten."
+        : "Verbindung zur Datenbank verloren.");
+      auth.signOut();
+    });
+  }
+
+  function unsubscribeAndReset() {
+    if (unsubscribeEntries) { unsubscribeEntries(); unsubscribeEntries = null; }
+    state.entries = [];
+    firstSnapshotHandled = false;
+  }
+
+  map.on("click", function (ev) {
+    if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
+    ghostMarker = L.circleMarker(ev.latlng, {
+      radius: 10, color: "#B9781A", weight: 2, dashArray: "3 3", fillOpacity: 0
+    }).addTo(map);
+    openSheet(null, { lat: ev.latlng.lat, lng: ev.latlng.lng, type: "spot" });
+  });
+
+  // event delegation for popup + list actions (both use .card markup)
+  document.addEventListener("click", function (ev) {
+    var card = ev.target.closest(".card");
+    if (!card) return;
+    var id = card.getAttribute("data-id");
+    var entry = state.entries.find(function (e) { return e.id === id; });
+    if (!entry) return;
+    if (ev.target.closest(".edit-btn")) openSheet(entry);
+    if (ev.target.closest(".delete-btn")) {
+      if (confirm('"' + entry.name + '" wirklich löschen?')) deleteEntry(entry);
+    }
+    if (ev.target.closest(".locate-on-map")) {
+      document.querySelectorAll(".tab-btn").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-tab") === "map" ? "true" : "false"); });
+      state.tab = "map";
+      document.getElementById("mapPane").hidden = false;
+      document.getElementById("listPane").hidden = true;
+      map.setView([entry.lat, entry.lng], 15);
+      setTimeout(function () { if (markers[entry.id]) markers[entry.id].openPopup(); }, 300);
+    }
+  });
+
+  document.querySelectorAll(".tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".tab-btn").forEach(function (b) { b.setAttribute("aria-selected", "false"); });
+      btn.setAttribute("aria-selected", "true");
+      state.tab = btn.getAttribute("data-tab");
+      var isMap = state.tab === "map";
+      document.getElementById("mapPane").hidden = !isMap;
+      document.getElementById("listPane").hidden = isMap;
+      if (isMap) { setTimeout(function () { map.invalidateSize(); }, 50); }
+      else renderList();
+    });
+  });
+
+  searchInput.addEventListener("input", function (ev) { state.search = ev.target.value; renderList(); });
+
+  // ---- add/edit sheet ----
+  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [] };
+  var DYN_FIELD_HTML = {
+    date: '<div class="field"><label for="f_date">Datum</label><input id="f_date" type="date" /></div>',
+    method: '<div class="field"><label for="f_method">Methode</label><select id="f_method"><option value="">–</option><option>Fliege</option><option>Spinnrute</option><option>Sonstige</option></select></div>',
+    lengthCm: '<div class="field"><label for="f_length">Länge (cm)</label><input id="f_length" type="number" inputmode="numeric" /></div>',
+    countFish: '<div class="field"><label for="f_count">Anzahl Fische</label><input id="f_count" type="number" inputmode="numeric" value="1" /></div>',
+    waterTempC: '<div class="field"><label for="f_temp">Wassertemp. (°C)</label><input id="f_temp" type="number" inputmode="numeric" /></div>',
+    wind: '<div class="field"><label for="f_wind">Wind</label><input id="f_wind" type="text" placeholder="z.B. Ost, 3 Bft" /></div>',
+    salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>',
+    weather: '<div class="field"><label for="f_weather">Wetter</label><input id="f_weather" type="text" placeholder="sonnig, wolkig …" /></div>'
+  };
+  var currentType = "spot", currentLanded = true, sheetEl = null;
+
+  function sheetTemplate() {
+    return '<div class="sheet-backdrop" id="sheetBackdrop"><div class="sheet">' +
+      '<h2 id="sheetTitle">Neuer Eintrag</h2>' +
+      '<div class="type-picker" id="mainTypePicker">' +
+        '<button type="button" class="type-opt spot" data-type="spot">Spot</button>' +
+        '<button type="button" class="type-opt catch" data-type="catch">Fang</button>' +
+        '<button type="button" class="type-opt parking" data-type="parking">Parken</button>' +
+        '<button type="button" class="type-opt access" data-type="access">Zugang</button>' +
+      "</div>" +
+      '<div class="field"><label for="f_name">Name</label><input id="f_name" type="text" placeholder="z.B. Steinige Kante am Leuchtturm" /></div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label for="f_lat">Breite (lat)</label><input id="f_lat" type="number" step="0.000001" inputmode="decimal" /></div>' +
+        '<div class="field"><label for="f_lng">Länge (lng)</label><input id="f_lng" type="number" step="0.000001" inputmode="decimal" /></div>' +
+      "</div>" +
+      '<button type="button" class="btn-secondary" id="locateBtn" style="margin-bottom:12px">📍 Aktuellen Standort verwenden</button>' +
+      '<div id="dynamicFields"></div>' +
+      '<div class="field"><label for="f_notes">Notizen</label><textarea id="f_notes" placeholder="Köder, Bedingungen, Beobachtungen …"></textarea></div>' +
+      '<div class="sheet-actions">' +
+        '<button type="button" class="btn-secondary" id="cancelBtn">Abbrechen</button>' +
+        '<button type="button" class="btn-primary" id="saveBtn">Speichern</button>' +
+      "</div>" +
+    "</div></div>";
+  }
+
+  var CATCH_FIELD_IDS = { date: "f_date", method: "f_method", lengthCm: "f_length", countFish: "f_count", waterTempC: "f_temp", wind: "f_wind", salinityPct: "f_sal", weather: "f_weather" };
+  var SHARED_CATCH_FIELDS = ["date", "method", "waterTempC", "wind", "salinityPct", "weather"];
+
+  function renderCatchFields() {
+    var preserve = {};
+    SHARED_CATCH_FIELDS.forEach(function (k) {
+      var el = document.getElementById(CATCH_FIELD_IDS[k]);
+      if (el) preserve[k] = el.value;
+    });
+    var order = ["date", "method"].concat(currentLanded ? ["lengthCm", "countFish"] : []).concat(["waterTempC", "wind", "salinityPct", "weather"]);
+    var html = '<div class="field"><label>Ergebnis</label><div class="type-picker" id="landedPicker">' +
+      '<button type="button" class="type-opt" data-landed="true" aria-pressed="' + (currentLanded === true) + '">Gelandet</button>' +
+      '<button type="button" class="type-opt" data-landed="false" aria-pressed="' + (currentLanded === false) + '">Nur Biss</button>' +
+      "</div></div>" +
+      order.map(function (f) { return DYN_FIELD_HTML[f] || ""; }).join("");
+    document.getElementById("dynamicFields").innerHTML = html;
+    SHARED_CATCH_FIELDS.forEach(function (k) {
+      var el = document.getElementById(CATCH_FIELD_IDS[k]);
+      if (el && preserve[k]) el.value = preserve[k];
+    });
+    document.querySelectorAll("#landedPicker .type-opt").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        currentLanded = btn.getAttribute("data-landed") === "true";
+        renderCatchFields();
+      });
+    });
+  }
+
+  function setType(type) {
+    currentType = type;
+    document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
+    if (type === "catch") {
+      renderCatchFields();
+    } else {
+      var fields = FIELDS_BY_TYPE[type];
+      document.getElementById("dynamicFields").innerHTML = fields.map(function (f) { return DYN_FIELD_HTML[f] || ""; }).join("");
+    }
+  }
+
+  function fillDynamic(entry) {
+    Object.keys(CATCH_FIELD_IDS).forEach(function (k) {
+      var el = document.getElementById(CATCH_FIELD_IDS[k]);
+      if (el && entry[k] != null) el.value = entry[k];
+    });
+  }
+
+  function openSheet(entry, preset) {
+    document.body.insertAdjacentHTML("beforeend", sheetTemplate());
+    sheetEl = document.getElementById("sheetBackdrop");
+    state.editingId = entry ? entry.id : null;
+    currentType = entry ? entry.type : (preset && preset.type) || "spot";
+    currentLanded = entry ? entry.landed !== false : true;
+    document.getElementById("sheetTitle").textContent = entry ? "Eintrag bearbeiten" : "Neuer Eintrag";
+    setType(currentType);
+    document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
+      btn.addEventListener("click", function () { currentLanded = true; setType(btn.getAttribute("data-type")); });
+    });
+    if (entry) {
+      document.getElementById("f_name").value = entry.name || "";
+      document.getElementById("f_lat").value = entry.lat;
+      document.getElementById("f_lng").value = entry.lng;
+      document.getElementById("f_notes").value = entry.notes || "";
+      fillDynamic(entry);
+    } else if (preset) {
+      document.getElementById("f_lat").value = preset.lat.toFixed(6);
+      document.getElementById("f_lng").value = preset.lng.toFixed(6);
+    }
+    document.getElementById("cancelBtn").addEventListener("click", closeSheet);
+    sheetEl.addEventListener("click", function (ev) { if (ev.target === sheetEl) closeSheet(); });
+    document.getElementById("saveBtn").addEventListener("click", saveEntry);
+    document.getElementById("locateBtn").addEventListener("click", useLocation);
+  }
+
+  function useLocation() {
+    var btn = document.getElementById("locateBtn");
+    btn.textContent = "Suche Standort …";
+    if (!navigator.geolocation) { btn.textContent = "Standort nicht verfügbar"; return; }
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      document.getElementById("f_lat").value = pos.coords.latitude.toFixed(6);
+      document.getElementById("f_lng").value = pos.coords.longitude.toFixed(6);
+      btn.textContent = "📍 Aktuellen Standort verwenden";
+    }, function () {
+      btn.textContent = "Standort nicht verfügbar";
+      setTimeout(function () { btn.textContent = "📍 Aktuellen Standort verwenden"; }, 2000);
+    }, { timeout: 8000 });
+  }
+
+  function closeSheet() {
+    if (sheetEl) sheetEl.remove();
+    sheetEl = null; state.editingId = null;
+    if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
+  }
+
+  function showToast(msg) {
+    var t = document.createElement("div");
+    t.className = "toast"; t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 2400);
+  }
+
+  function saveEntry() {
+    var lat = parseFloat(document.getElementById("f_lat").value);
+    var lng = parseFloat(document.getElementById("f_lng").value);
+    if (isNaN(lat) || isNaN(lng)) { showToast("Bitte Koordinaten eintragen"); return; }
+    var data = {
+      type: currentType,
+      name: document.getElementById("f_name").value.trim() || TYPE_LABEL[currentType],
+      lat: lat, lng: lng,
+      notes: document.getElementById("f_notes").value.trim() || null
+    };
+    if (currentType === "catch") {
+      var g = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
+      data.landed = currentLanded;
+      data.date = g("f_date") || null;
+      data.method = g("f_method") || null;
+      data.lengthCm = currentLanded && g("f_length") ? parseInt(g("f_length"), 10) : null;
+      data.countFish = currentLanded ? (g("f_count") ? parseInt(g("f_count"), 10) : 1) : null;
+      data.waterTempC = g("f_temp") ? parseInt(g("f_temp"), 10) : null;
+      data.wind = g("f_wind") || null;
+      data.salinityPct = g("f_sal") || null;
+      data.weather = g("f_weather") || null;
+    }
+    var saveBtn = document.getElementById("saveBtn");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Speichert …";
+    var promise;
+    if (state.editingId) {
+      data.updatedAt = new Date().toISOString();
+      promise = db.collection("entries").doc(state.editingId).update(data);
+    } else {
+      data.createdAt = new Date().toISOString();
+      data.createdBy = auth.currentUser ? auth.currentUser.email : null;
+      promise = db.collection("entries").add(data);
+    }
+    promise.then(function () {
+      closeSheet();
+      showToast("Gespeichert");
+    }).catch(function (err) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Speichern";
+      showToast("Fehler beim Speichern: " + (err && err.message ? err.message : "unbekannt"));
+    });
+  }
+
+  function deleteEntry(entry) {
+    db.collection("entries").doc(entry.id).delete().then(function () {
+      showToast("Gelöscht");
+    }).catch(function () {
+      showToast("Konnte nicht gelöscht werden");
+    });
+  }
+
+  document.getElementById("fabAdd").addEventListener("click", function () {
+    var c = map.getCenter();
+    openSheet(null, { lat: c.lat, lng: c.lng, type: "spot" });
+  });
+
+  // ---- auth ----
+  var authMode = "signin";
+  var authLoadingEl = document.getElementById("authLoading");
+  var authScreenEl = document.getElementById("authScreen");
+  var authSubEl = document.getElementById("authSub");
+  var authErrorEl = document.getElementById("authError");
+  var authEmailEl = document.getElementById("auth_email");
+  var authPassEl = document.getElementById("auth_pass");
+  var authSubmitBtn = document.getElementById("authSubmitBtn");
+  var appEl = document.getElementById("app");
+
+  function showAuthError(msg) {
+    authErrorEl.textContent = msg;
+    authErrorEl.classList.add("show");
+  }
+  function clearAuthError() {
+    authErrorEl.textContent = "";
+    authErrorEl.classList.remove("show");
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    clearAuthError();
+    if (mode === "signin") {
+      authSubEl.textContent = "Mit E-Mail anmelden";
+      authSubmitBtn.textContent = "Anmelden";
+      document.getElementById("authModeSwitch").innerHTML = 'Noch kein Konto? <button type="button" id="authModeToggle">Registrieren</button>';
+    } else {
+      authSubEl.textContent = "Neues Konto erstellen (nur mit freigeschalteter E-Mail nutzbar)";
+      authSubmitBtn.textContent = "Registrieren";
+      document.getElementById("authModeSwitch").innerHTML = 'Schon ein Konto? <button type="button" id="authModeToggle">Anmelden</button>';
+    }
+    document.getElementById("authModeToggle").addEventListener("click", function () {
+      setAuthMode(authMode === "signin" ? "signup" : "signin");
+    });
+  }
+  setAuthMode("signin");
+
+  function authErrorMessage(err) {
+    var msgs = {
+      "auth/invalid-email": "Ungültige E-Mail-Adresse.",
+      "auth/user-not-found": "Kein Konto mit dieser E-Mail gefunden.",
+      "auth/wrong-password": "Falsches Passwort.",
+      "auth/email-already-in-use": "Für diese E-Mail existiert bereits ein Konto – bitte anmelden.",
+      "auth/weak-password": "Passwort zu kurz (mind. 6 Zeichen).",
+      "auth/invalid-credential": "E-Mail oder Passwort falsch."
+    };
+    return msgs[err.code] || (err.message || "Unbekannter Fehler.");
+  }
+
+  authSubmitBtn.addEventListener("click", function () {
+    clearAuthError();
+    var email = authEmailEl.value.trim();
+    var pass = authPassEl.value;
+    if (!email || !pass) { showAuthError("Bitte E-Mail und Passwort eingeben."); return; }
+    authSubmitBtn.disabled = true;
+    var original = authSubmitBtn.textContent;
+    authSubmitBtn.textContent = "Bitte warten …";
+    var action = authMode === "signin"
+      ? auth.signInWithEmailAndPassword(email, pass)
+      : auth.createUserWithEmailAndPassword(email, pass);
+    action.catch(function (err) {
+      showAuthError(authErrorMessage(err));
+    }).finally(function () {
+      authSubmitBtn.disabled = false;
+      authSubmitBtn.textContent = original;
+    });
+  });
+
+  document.getElementById("signOutBtn").addEventListener("click", function () { auth.signOut(); });
+
+  auth.onAuthStateChanged(function (user) {
+    authLoadingEl.hidden = true;
+    if (user) {
+      authScreenEl.hidden = true;
+      appEl.hidden = false;
+      document.getElementById("viewerNote").textContent = user.email;
+      subscribeEntries();
+    } else {
+      appEl.hidden = true;
+      unsubscribeAndReset();
+      authScreenEl.hidden = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
