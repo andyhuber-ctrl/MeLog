@@ -327,8 +327,9 @@
     }
     var tags = cardTags(e);
     var metaBits = [];
-    if (e.type === "catch" && e.date) metaBits.push(fmtDate(e.date));
-    metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
+    var isCatch = e.type === "catch";
+    if (isCatch && e.date) metaBits.push(fmtDate(e.date));
+    if (!isCatch) metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
     if (e.createdBy) metaBits.push(e.createdBy);
     return '' +
       '<div class="card" data-id="' + e.id + '">' +
@@ -337,12 +338,11 @@
           '<div class="card-body">' +
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
-            '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" +
+            (metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "") +
             (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
             (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
             '<div class="card-actions">' +
-              '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a>' +
-              '<a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' +
+              (isCatch ? "" : '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a><a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>') +
               '<button type="button" class="locate-on-map">Auf Karte</button>' +
               '<button type="button" class="edit-btn">Bearbeiten</button>' +
               '<button type="button" class="danger delete-btn">Löschen</button>' +
@@ -392,6 +392,7 @@
   var markers = {};
   var markerLayer = L.layerGroup().addTo(map);
   var ghostMarker = null;
+  var pickingLocation = false;
   var mapTypeFilter = { spot: true, catch: true, parking: true, access: true };
 
   var FISH_ICON_SRC = "icons/fisch-icon-transparent.png";
@@ -503,6 +504,14 @@
     ghostMarker = L.circleMarker(ev.latlng, {
       radius: 10, color: "#B9781A", weight: 2, dashArray: "3 3", fillOpacity: 0
     }).addTo(map);
+    if (pickingLocation) {
+      pickingLocation = false;
+      document.getElementById("f_lat").value = ev.latlng.lat.toFixed(6);
+      document.getElementById("f_lng").value = ev.latlng.lng.toFixed(6);
+      sheetEl.style.display = "";
+      showToast("Position aktualisiert");
+      return;
+    }
     openSheet(null, { lat: ev.latlng.lat, lng: ev.latlng.lng, type: "spot" });
   });
 
@@ -544,11 +553,15 @@
 
   // ---- add/edit sheet ----
   var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [] };
+  var SPECIES = ["Meerforelle", "Lachs", "Dorsch", "Hornhecht", "Hecht", "Barsch", "Scholle", "Flunder", "Aal", "Makrele", "Sonstige"];
+  var METHOD_LEGACY = { "Fliege": "Fliegenfischen", "Spinnrute": "Spinnfischen" };
   var DYN_FIELD_HTML = {
     date: '<div class="field"><label for="f_date">Datum</label><input id="f_date" type="date" /></div>',
-    method: '<div class="field"><label for="f_method">Methode</label><select id="f_method"><option value="">–</option><option>Fliege</option><option>Spinnrute</option><option>Sonstige</option></select></div>',
+    time: '<div class="field"><label for="f_time">Uhrzeit</label><input id="f_time" type="time" /></div>',
+    method: '<div class="field"><label for="f_method">Methode</label><select id="f_method"><option value="">–</option><option>Fliegenfischen</option><option>Spinnfischen</option><option>Sonstiges</option></select></div>',
     lengthCm: '<div class="field"><label for="f_length">Länge (cm)</label><input id="f_length" type="number" inputmode="numeric" /></div>',
     countFish: '<div class="field"><label for="f_count">Anzahl Fische</label><input id="f_count" type="number" inputmode="numeric" value="1" /></div>',
+    envFetch: '<button type="button" class="btn-secondary" id="envFetchBtn" style="width:100%;margin-bottom:12px">🌊 Wind &amp; Wassertemperatur automatisch laden</button><div class="form-hint" id="envFetchHint">Aus öffentlichen Wetterdaten (Open-Meteo), basierend auf Ort, Datum &amp; Uhrzeit. Salzgehalt ist darüber leider nicht verfügbar – bitte weiter manuell eintragen.</div>',
     waterTempC: '<div class="field"><label for="f_temp">Wassertemp. (°C)</label><input id="f_temp" type="number" inputmode="numeric" /></div>',
     wind: '<div class="field"><label for="f_wind">Wind</label><input id="f_wind" type="text" placeholder="z.B. Ost, 3 Bft" /></div>',
     salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>',
@@ -565,12 +578,15 @@
         '<button type="button" class="type-opt parking" data-type="parking">Parken</button>' +
         '<button type="button" class="type-opt access" data-type="access">Zugang</button>' +
       "</div>" +
-      '<div class="field"><label for="f_name">Name</label><input id="f_name" type="text" placeholder="z.B. Steinige Kante am Leuchtturm" /></div>' +
-      '<div class="field-row">' +
-        '<div class="field"><label for="f_lat">Breite (lat)</label><input id="f_lat" type="number" step="0.000001" inputmode="decimal" /></div>' +
-        '<div class="field"><label for="f_lng">Länge (lng)</label><input id="f_lng" type="number" step="0.000001" inputmode="decimal" /></div>' +
+      '<div id="nameFieldContainer"></div>' +
+      '<div id="coordsSection">' +
+        '<div class="field-row">' +
+          '<div class="field"><label for="f_lat">Breite (lat)</label><input id="f_lat" type="number" step="0.000001" inputmode="decimal" /></div>' +
+          '<div class="field"><label for="f_lng">Länge (lng)</label><input id="f_lng" type="number" step="0.000001" inputmode="decimal" /></div>' +
+        "</div>" +
+        '<button type="button" class="btn-secondary" id="locateBtn" style="margin-bottom:12px">📍 Aktuellen Standort verwenden</button>' +
       "</div>" +
-      '<button type="button" class="btn-secondary" id="locateBtn" style="margin-bottom:12px">📍 Aktuellen Standort verwenden</button>' +
+      '<button type="button" class="btn-secondary" id="moveOnMapBtn" style="width:100%;margin-bottom:12px">🗺️ Position auf Karte verschieben</button>' +
       '<div id="dynamicFields"></div>' +
       '<div class="field"><label for="f_notes">Notizen</label><textarea id="f_notes" placeholder="Köder, Bedingungen, Beobachtungen …"></textarea></div>' +
       '<div class="sheet-actions">' +
@@ -580,8 +596,8 @@
     "</div></div>";
   }
 
-  var CATCH_FIELD_IDS = { date: "f_date", method: "f_method", lengthCm: "f_length", countFish: "f_count", waterTempC: "f_temp", wind: "f_wind", salinityPct: "f_sal", weather: "f_weather" };
-  var SHARED_CATCH_FIELDS = ["date", "method", "waterTempC", "wind", "salinityPct", "weather"];
+  var CATCH_FIELD_IDS = { date: "f_date", time: "f_time", method: "f_method", lengthCm: "f_length", countFish: "f_count", waterTempC: "f_temp", wind: "f_wind", salinityPct: "f_sal", weather: "f_weather" };
+  var SHARED_CATCH_FIELDS = ["date", "time", "method", "waterTempC", "wind", "salinityPct", "weather"];
 
   function renderCatchFields() {
     var preserve = {};
@@ -589,7 +605,7 @@
       var el = document.getElementById(CATCH_FIELD_IDS[k]);
       if (el) preserve[k] = el.value;
     });
-    var order = ["date", "method"].concat(currentLanded ? ["lengthCm", "countFish"] : []).concat(["waterTempC", "wind", "salinityPct", "weather"]);
+    var order = ["date", "time", "method"].concat(currentLanded ? ["lengthCm", "countFish"] : []).concat(["envFetch", "waterTempC", "wind", "salinityPct", "weather"]);
     var html = '<div class="field"><label>Ergebnis</label><div class="type-picker" id="landedPicker">' +
       '<button type="button" class="type-opt" data-landed="true" aria-pressed="' + (currentLanded === true) + '">Gelandet</button>' +
       '<button type="button" class="type-opt" data-landed="false" aria-pressed="' + (currentLanded === false) + '">Nur Biss</button>' +
@@ -600,6 +616,7 @@
       var el = document.getElementById(CATCH_FIELD_IDS[k]);
       if (el && preserve[k]) el.value = preserve[k];
     });
+    document.getElementById("envFetchBtn").addEventListener("click", fetchEnvironmentData);
     document.querySelectorAll("#landedPicker .type-opt").forEach(function (btn) {
       btn.addEventListener("click", function () {
         currentLanded = btn.getAttribute("data-landed") === "true";
@@ -608,9 +625,21 @@
     });
   }
 
+  function nameFieldHtml(isCatch, selectedSpecies) {
+    if (isCatch) {
+      return '<div class="field"><label for="f_name">Art</label><select id="f_name">' +
+        SPECIES.map(function (s) { return '<option' + (s === selectedSpecies ? " selected" : "") + '>' + s + "</option>"; }).join("") +
+        "</select></div>";
+    }
+    return '<div class="field"><label for="f_name">Name</label><input id="f_name" type="text" placeholder="z.B. Steinige Kante am Leuchtturm" /></div>';
+  }
+
   function setType(type) {
+    var previousName = document.getElementById("f_name") ? document.getElementById("f_name").value : null;
     currentType = type;
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
+    document.getElementById("nameFieldContainer").innerHTML = nameFieldHtml(type === "catch", type === "catch" ? previousName : null);
+    document.getElementById("coordsSection").hidden = type === "catch";
     if (type === "catch") {
       renderCatchFields();
     } else {
@@ -622,7 +651,7 @@
   function fillDynamic(entry) {
     Object.keys(CATCH_FIELD_IDS).forEach(function (k) {
       var el = document.getElementById(CATCH_FIELD_IDS[k]);
-      if (el && entry[k] != null) el.value = entry[k];
+      if (el && entry[k] != null) el.value = (k === "method" && METHOD_LEGACY[entry[k]]) ? METHOD_LEGACY[entry[k]] : entry[k];
     });
   }
 
@@ -651,6 +680,11 @@
     sheetEl.addEventListener("click", function (ev) { if (ev.target === sheetEl) closeSheet(); });
     document.getElementById("saveBtn").addEventListener("click", saveEntry);
     document.getElementById("locateBtn").addEventListener("click", useLocation);
+    document.getElementById("moveOnMapBtn").addEventListener("click", function () {
+      pickingLocation = true;
+      sheetEl.style.display = "none";
+      showToast("Tippe auf die neue Position auf der Karte");
+    });
   }
 
   function useLocation() {
@@ -667,9 +701,66 @@
     }, { timeout: 8000 });
   }
 
+  function degToCompass(deg) {
+    var dirs = ["Nord", "Nordost", "Ost", "Südost", "Süd", "Südwest", "West", "Nordwest"];
+    return dirs[Math.round(deg / 45) % 8];
+  }
+
+  function fetchEnvironmentData() {
+    var date = document.getElementById("f_date").value;
+    var time = document.getElementById("f_time").value || "12:00";
+    var lat = parseFloat(document.getElementById("f_lat").value);
+    var lng = parseFloat(document.getElementById("f_lng").value);
+    if (!date) { showToast("Bitte zuerst ein Datum eintragen"); return; }
+    if (isNaN(lat) || isNaN(lng)) { showToast("Keine Koordinaten vorhanden – erst Position setzen"); return; }
+    var btn = document.getElementById("envFetchBtn");
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Lädt …";
+    var hourKey = date + "T" + time.slice(0, 2) + ":00";
+    var tz = "Europe%2FBerlin";
+    var windUrl = "https://archive-api.open-meteo.com/v1/archive?latitude=" + lat + "&longitude=" + lng +
+      "&start_date=" + date + "&end_date=" + date + "&hourly=wind_speed_10m,wind_direction_10m&timezone=" + tz;
+    var seaUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + lat + "&longitude=" + lng +
+      "&start_date=" + date + "&end_date=" + date + "&hourly=sea_surface_temperature&timezone=" + tz;
+
+    Promise.all([
+      fetch(windUrl).then(function (r) { return r.json(); }).catch(function () { return null; }),
+      fetch(seaUrl).then(function (r) { return r.json(); }).catch(function () { return null; })
+    ]).then(function (results) {
+      var wind = results[0], sea = results[1];
+      var filled = [];
+      if (wind && wind.hourly && wind.hourly.time) {
+        var idx = wind.hourly.time.indexOf(hourKey);
+        if (idx === -1) idx = 12;
+        var speed = wind.hourly.wind_speed_10m[idx];
+        var dir = wind.hourly.wind_direction_10m[idx];
+        if (speed != null && dir != null) {
+          document.getElementById("f_wind").value = Math.round(speed) + " km/h aus " + degToCompass(dir);
+          filled.push("Wind");
+        }
+      }
+      if (sea && sea.hourly && sea.hourly.time) {
+        var idx2 = sea.hourly.time.indexOf(hourKey);
+        if (idx2 === -1) idx2 = 12;
+        var temp = sea.hourly.sea_surface_temperature[idx2];
+        if (temp != null) {
+          document.getElementById("f_temp").value = Math.round(temp);
+          filled.push("Wassertemperatur");
+        }
+      }
+      showToast(filled.length ? filled.join(" & ") + " eingetragen" : "Keine Daten für diesen Ort/Zeitpunkt verfügbar");
+    }).catch(function () {
+      showToast("Wetterdaten konnten nicht geladen werden");
+    }).finally(function () {
+      btn.disabled = false;
+      btn.textContent = original;
+    });
+  }
+
   function closeSheet() {
     if (sheetEl) sheetEl.remove();
-    sheetEl = null; state.editingId = null;
+    sheetEl = null; state.editingId = null; pickingLocation = false;
     if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
   }
 
