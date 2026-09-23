@@ -384,7 +384,9 @@
       return da < db_ ? 1 : da > db_ ? -1 : 0;
     });
     listRoot.innerHTML = filtered.length
-      ? '<div class="card-list">' + filtered.map(cardHtml).join("") + "</div>"
+      ? '<div class="card-list">' + filtered.map(function (e) {
+          try { return cardHtml(e); } catch (err) { console.error("Karte konnte nicht gerendert werden:", e.id, e.name, err); return ""; }
+        }).join("") + "</div>"
       : '<div class="empty-state">Noch nichts hier. Tippe auf + um einen Eintrag hinzuzufügen.</div>';
   }
 
@@ -449,14 +451,23 @@
     markerLayer.clearLayers();
     markers = {};
     var areaColor = cssVar("--accent") || "#0E6E7A";
+    var failed = [];
     state.entries.forEach(function (e) {
       if (!mapTypeFilter[e.type]) return;
-      var layer = hasPolygon(e)
-        ? L.polygon(polygonLatLngs(e), { color: areaColor, weight: 2, fillColor: areaColor, fillOpacity: 0.25 }).addTo(markerLayer)
-        : L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
-      layer.bindPopup(popupHtml(e), { closeButton: true, maxWidth: 280 });
-      markers[e.id] = layer;
+      try {
+        var layer = hasPolygon(e)
+          ? L.polygon(polygonLatLngs(e), { color: areaColor, weight: 2, fillColor: areaColor, fillOpacity: 0.25 }).addTo(markerLayer)
+          : L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
+        layer.bindPopup(popupHtml(e), { closeButton: true, maxWidth: 280 });
+        markers[e.id] = layer;
+      } catch (err) {
+        failed.push(e);
+        console.error("Eintrag konnte nicht auf der Karte angezeigt werden:", e.id, e.name, err);
+      }
     });
+    if (failed.length) {
+      showToast(failed.length + " Eintrag" + (failed.length === 1 ? "" : "e") + " konnte" + (failed.length === 1 ? "" : "n") + " nicht angezeigt werden (siehe Konsole)");
+    }
   }
 
   document.querySelectorAll(".map-filter-chip").forEach(function (chip) {
@@ -472,9 +483,14 @@
     if (!state.entries.length) { map.setView([56, 11], 5); return; }
     var pts = [];
     state.entries.forEach(function (e) {
-      if (hasPolygon(e)) pts = pts.concat(polygonLatLngs(e));
-      else pts.push([e.lat, e.lng]);
+      try {
+        if (hasPolygon(e)) pts = pts.concat(polygonLatLngs(e));
+        else if (isFinite(e.lat) && isFinite(e.lng)) pts.push([e.lat, e.lng]);
+      } catch (err) {
+        console.error("Eintrag konnte nicht in die Kartenansicht einbezogen werden:", e.id, e.name, err);
+      }
     });
+    if (!pts.length) { map.setView([56, 11], 5); return; }
     map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 13 });
   }
 
