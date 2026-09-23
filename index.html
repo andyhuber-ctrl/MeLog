@@ -145,6 +145,8 @@
   .card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .card-actions a, .card-actions button { font-size: 0.78rem; text-decoration: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
   .card-actions .danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  .card-actions-compact { justify-content: flex-end; }
+  .card-actions-compact .icon-btn { width: 32px; height: 32px; padding: 0; border-radius: 50%; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
   .empty-state { text-align: center; padding: 40px 16px; color: var(--ink-faint); }
 
   .fab { position: fixed; right: 18px; bottom: 22px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
@@ -280,6 +282,8 @@
   var ZONE_CLASSES = ["ganzjaehrig", "zeitlich"];
   var ZONE_CLASS_LABEL = { ganzjaehrig: "Ganzjährig", zeitlich: "Zeitlich begrenzt" };
   var ALWAYS_POLYGON_TYPES = { schutzzone: true };
+  var MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  var SUBSTRATE_TYPES = ["Steinig", "Sand", "Schlamm", "Kies", "Tang", "Seegras", "Muschelbank", "Sonstiges"];
 
   function spotClassOf(e) {
     if (e.spotClass) return e.spotClass;
@@ -380,6 +384,12 @@
     if (e.type === "spot" && spotClassOf(e) !== "spot") tags.push(SPOT_CLASS_LABEL[spotClassOf(e)]);
     if (e.type === "schutzzone") tags.push(ZONE_CLASS_LABEL[zoneClassOf(e)]);
     if (hasPolygon(e)) tags.push("Fläche");
+    if (e.type === "spot" && e.goodMonths && e.goodMonths.length) {
+      tags.push("Fängig: " + MONTHS.filter(function (m) { return e.goodMonths.indexOf(m) !== -1; }).join(", "));
+    }
+    if (e.type === "spot" && e.substrate && e.substrate.length) {
+      tags.push(SUBSTRATE_TYPES.filter(function (s) { return e.substrate.indexOf(s) !== -1; }).join(", "));
+    }
     if (e.method) tags.push(e.method);
     if (e.waterTempC != null) tags.push(e.waterTempC + "° Wasser");
     if (e.wind) tags.push("Wind " + e.wind);
@@ -388,8 +398,8 @@
     return tags;
   }
 
-  function cardHtml(e) {
-    var showMapsLinks = e.type !== "catch" && !hasPolygon(e);
+  function cardHtml(e, isPopup) {
+    var showMapsLinks = !isPopup && e.type !== "catch" && !hasPolygon(e);
     var links = showMapsLinks ? mapsLinks(e.lat, e.lng, e.name) : null;
     var statLine = "";
     if (e.type === "catch") {
@@ -398,6 +408,7 @@
       if (e.countFish && e.countFish > 1) statLine = e.countFish + "× " + statLine;
     }
     var tags = cardTags(e);
+    if (isPopup) tags = tags.filter(function (t) { return t !== "Fläche"; });
     var metaBits = [];
     var isCatch = e.type === "catch";
     if (isCatch && e.date) metaBits.push(fmtDate(e.date));
@@ -416,11 +427,12 @@
             (metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "") +
             (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
             (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
-            '<div class="card-actions">' +
+            '<div class="card-actions' + (isPopup ? " card-actions-compact" : "") + '">' +
               (showMapsLinks ? '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a><a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' : "") +
-              '<button type="button" class="locate-on-map">Auf Karte</button>' +
-              '<button type="button" class="edit-btn">Bearbeiten</button>' +
-              '<button type="button" class="danger delete-btn">Löschen</button>' +
+              (isPopup ? "" : '<button type="button" class="locate-on-map">Auf Karte</button>') +
+              (isPopup
+                ? '<button type="button" class="edit-btn icon-btn" title="Bearbeiten" aria-label="Bearbeiten">✏️</button><button type="button" class="danger delete-btn icon-btn" title="Löschen" aria-label="Löschen">🗑️</button>'
+                : '<button type="button" class="edit-btn">Bearbeiten</button><button type="button" class="danger delete-btn">Löschen</button>') +
             "</div>" +
           "</div>" +
         "</div>" +
@@ -513,7 +525,7 @@
   }
 
   function popupHtml(e) {
-    return cardHtml(e);
+    return cardHtml(e, true);
   }
 
   function rebuildMarkers() {
@@ -697,6 +709,7 @@
   var currentType = "spot", currentLanded = true, sheetEl = null;
   var currentGeometry = "point", pendingPolygon = [];
   var currentSpotClass = "spot", currentZoneClass = "ganzjaehrig";
+  var currentGoodMonths = [], currentSubstrate = [];
 
   function currentEntryColor() {
     if (currentType === "schutzzone") return cssVar(currentZoneClass === "zeitlich" ? "--schutzzone-zeitlich" : "--schutzzone-ganzjaehrig");
@@ -806,6 +819,22 @@
       "</div></div>";
   }
 
+  function monthPickerHtml() {
+    return '<div class="field"><label>Fängig in diesen Monaten</label><div class="type-picker" id="monthPicker">' +
+      MONTHS.map(function (m) {
+        return '<button type="button" class="type-opt" data-month="' + m + '" aria-pressed="' + (currentGoodMonths.indexOf(m) !== -1) + '">' + m + "</button>";
+      }).join("") +
+      "</div></div>";
+  }
+
+  function substratePickerHtml() {
+    return '<div class="field"><label>Beschaffenheit</label><div class="type-picker" id="substratePicker">' +
+      SUBSTRATE_TYPES.map(function (s) {
+        return '<button type="button" class="type-opt" data-substrate="' + s + '" aria-pressed="' + (currentSubstrate.indexOf(s) !== -1) + '">' + s + "</button>";
+      }).join("") +
+      "</div></div>";
+  }
+
   function updatePolygonStatus() {
     var n = pendingPolygon.length;
     document.getElementById("polygonStatus").textContent = n >= 3
@@ -831,7 +860,7 @@
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
     document.getElementById("nameFieldContainer").innerHTML = nameFieldHtml(type === "catch", type === "catch" ? previousName : null);
     var extraHtml = "";
-    if (type === "spot") extraHtml = spotClassPickerHtml() + geomPickerHtml();
+    if (type === "spot") extraHtml = spotClassPickerHtml() + geomPickerHtml() + monthPickerHtml() + substratePickerHtml();
     else if (type === "schutzzone") extraHtml = zoneClassPickerHtml();
     document.getElementById("geomPickerContainer").innerHTML = extraHtml;
     if (type === "spot") {
@@ -846,6 +875,22 @@
           currentGeometry = btn.getAttribute("data-geom");
           document.querySelectorAll("#geomPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-geom") === currentGeometry ? "true" : "false"); });
           updateGeometrySections();
+        });
+      });
+      document.querySelectorAll("#monthPicker .type-opt").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var m = btn.getAttribute("data-month");
+          var idx = currentGoodMonths.indexOf(m);
+          if (idx === -1) currentGoodMonths.push(m); else currentGoodMonths.splice(idx, 1);
+          btn.setAttribute("aria-pressed", idx === -1 ? "true" : "false");
+        });
+      });
+      document.querySelectorAll("#substratePicker .type-opt").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var s = btn.getAttribute("data-substrate");
+          var idx = currentSubstrate.indexOf(s);
+          if (idx === -1) currentSubstrate.push(s); else currentSubstrate.splice(idx, 1);
+          btn.setAttribute("aria-pressed", idx === -1 ? "true" : "false");
         });
       });
     } else if (type === "schutzzone") {
@@ -882,6 +927,8 @@
     currentGeometry = (ALWAYS_POLYGON_TYPES[currentType] || hasPolygon({ polygon: pendingPolygon })) ? "polygon" : "point";
     currentSpotClass = entry ? spotClassOf(entry) : "spot";
     currentZoneClass = entry ? zoneClassOf(entry) : "ganzjaehrig";
+    currentGoodMonths = entry && entry.goodMonths ? entry.goodMonths.slice() : [];
+    currentSubstrate = entry && entry.substrate ? entry.substrate.slice() : [];
     document.getElementById("sheetTitle").textContent = entry ? "Eintrag bearbeiten" : "Neuer Eintrag";
     setType(currentType);
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
@@ -1236,6 +1283,8 @@
       polygon: polygon,
       spotClass: currentType === "spot" ? currentSpotClass : null,
       zoneClass: currentType === "schutzzone" ? currentZoneClass : null,
+      goodMonths: currentType === "spot" ? currentGoodMonths.slice() : null,
+      substrate: currentType === "spot" ? currentSubstrate.slice() : null,
       notes: document.getElementById("f_notes").value.trim() || null
     };
     if (currentType === "catch") {
