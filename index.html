@@ -90,17 +90,22 @@
     z-index: 500; pointer-events: none;
     max-width: calc(100% - 120px); text-align: center;
   }
-  .map-filter-row {
+  .map-filter-toggle {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    z-index: 500; display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-start;
-    max-width: calc(100% - 120px); overflow-x: auto; scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    z-index: 500; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; color: var(--ink-soft);
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
   }
-  .map-filter-row::-webkit-scrollbar { display: none; }
+  .map-filter-panel {
+    position: absolute; top: 48px; left: 50%; transform: translateX(-50%);
+    z-index: 500; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 6px;
+    max-width: calc(100% - 40px);
+  }
   .map-filter-chip {
-    background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    background: var(--surface-2); border: 1px solid var(--border);
     padding: 5px 12px; border-radius: 999px; font-size: 0.76rem; font-weight: 600;
-    color: var(--ink-faint); cursor: pointer; white-space: nowrap; flex: 0 0 auto;
+    color: var(--ink-faint); cursor: pointer; white-space: nowrap; text-align: left;
   }
   .map-filter-chip.active { color: #fff; border-color: transparent; }
   .map-filter-chip.active[data-type="spot"] { background: var(--accent); }
@@ -108,6 +113,10 @@
   .map-filter-chip.active[data-type="parking"] { background: var(--parking); }
   .map-filter-chip.active[data-type="access"] { background: var(--access); }
   .map-filter-chip.active[data-type="schutzzone"] { background: var(--schutzzone-ganzjaehrig); }
+
+  .vertex-handle { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,0.4); cursor: grab; }
+  .vertex-handle-mid { width: 14px; height: 14px; border-width: 2px; opacity: 0.8; cursor: copy; }
+  .move-handle { border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); cursor: grab; }
 
   .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
   .filter-row input[type="search"] { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; color: var(--ink); font-size: 0.9rem; }
@@ -237,7 +246,8 @@
   <main>
     <div id="mapPane">
       <div id="map"></div>
-      <div class="map-filter-row" id="mapFilterRow">
+      <button type="button" class="map-filter-toggle" id="mapFilterToggle">&#128269; Filter</button>
+      <div class="map-filter-panel" id="mapFilterRow" hidden>
         <button type="button" class="map-filter-chip active" data-type="spot">Spots</button>
         <button type="button" class="map-filter-chip active" data-type="catch">F&auml;nge</button>
         <button type="button" class="map-filter-chip active" data-type="parking">Parken</button>
@@ -379,7 +389,8 @@
   }
 
   function cardHtml(e) {
-    var links = mapsLinks(e.lat, e.lng, e.name);
+    var showMapsLinks = e.type !== "catch" && !hasPolygon(e);
+    var links = showMapsLinks ? mapsLinks(e.lat, e.lng, e.name) : null;
     var statLine = "";
     if (e.type === "catch") {
       if (e.lengthMinCm && e.lengthMaxCm) statLine = e.lengthMinCm + "–" + e.lengthMaxCm + " cm";
@@ -406,7 +417,7 @@
             (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
             (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
             '<div class="card-actions">' +
-              (isCatch ? "" : '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a><a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>') +
+              (showMapsLinks ? '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a><a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' : "") +
               '<button type="button" class="locate-on-map">Auf Karte</button>' +
               '<button type="button" class="edit-btn">Bearbeiten</button>' +
               '<button type="button" class="danger delete-btn">Löschen</button>' +
@@ -459,7 +470,7 @@
   var markers = {};
   var markerLayer = L.layerGroup().addTo(map);
   var ghostMarker = null;
-  var pickingLocation = false;
+  var moveMarker = null;
   var mapTypeFilter = { spot: true, catch: true, parking: true, access: true, schutzzone: true };
 
   var drawingPolygon = false;
@@ -467,6 +478,15 @@
   var drawingPreviewLayer = null;
   var drawingVertexLayer = L.layerGroup().addTo(map);
   var drawToolbarEl = null;
+
+  var editingPolygonVertices = false;
+  var editingVertices = [];
+  var editingPolygonPreview = null;
+  var vertexHandleLayer = L.layerGroup().addTo(map);
+  var midpointHandleLayer = L.layerGroup().addTo(map);
+  var vertexMarkers = [];
+  var midpointMarkers = [];
+  var editVerticesToolbarEl = null;
 
   var FISH_ICON_SRC = "icons/fisch-icon-transparent.png";
   var FISH_IMG_TAG = '<img src="' + FISH_ICON_SRC + '" alt="" />';
@@ -526,6 +546,9 @@
       chip.classList.toggle("active", mapTypeFilter[type]);
       rebuildMarkers();
     });
+  });
+  document.getElementById("mapFilterToggle").addEventListener("click", function () {
+    document.getElementById("mapFilterRow").hidden = !document.getElementById("mapFilterRow").hidden;
   });
 
   function fitToAllEntries() {
@@ -601,18 +624,11 @@
       updateDrawToolbarHint();
       return;
     }
+    if (editingPolygonVertices) return;
     if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
     ghostMarker = L.circleMarker(ev.latlng, {
       radius: 10, color: "#B9781A", weight: 2, dashArray: "3 3", fillOpacity: 0
     }).addTo(map);
-    if (pickingLocation) {
-      pickingLocation = false;
-      document.getElementById("f_lat").value = ev.latlng.lat.toFixed(6);
-      document.getElementById("f_lng").value = ev.latlng.lng.toFixed(6);
-      sheetEl.style.display = "";
-      showToast("Position aktualisiert");
-      return;
-    }
     openSheet(null, { lat: ev.latlng.lat, lng: ev.latlng.lng, type: "spot" });
   });
 
@@ -637,6 +653,15 @@
       setTimeout(function () { if (markers[entry.id]) markers[entry.id].openPopup(); }, 300);
     }
   });
+
+  function switchToMapTab() {
+    if (state.tab === "map") return;
+    document.querySelectorAll(".tab-btn").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-tab") === "map" ? "true" : "false"); });
+    state.tab = "map";
+    document.getElementById("mapPane").hidden = false;
+    document.getElementById("listPane").hidden = true;
+    map.invalidateSize();
+  }
 
   document.querySelectorAll(".tab-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -673,6 +698,19 @@
   var currentGeometry = "point", pendingPolygon = [];
   var currentSpotClass = "spot", currentZoneClass = "ganzjaehrig";
 
+  function currentEntryColor() {
+    if (currentType === "schutzzone") return cssVar(currentZoneClass === "zeitlich" ? "--schutzzone-zeitlich" : "--schutzzone-ganzjaehrig");
+    if (currentType === "spot") {
+      if (currentSpotClass === "hotspot") return cssVar("--hotspot");
+      if (currentSpotClass === "potspot") return cssVar("--potspot");
+      return cssVar("--accent");
+    }
+    if (currentType === "catch") return cssVar("--catch");
+    if (currentType === "parking") return cssVar("--parking");
+    if (currentType === "access") return cssVar("--access");
+    return cssVar("--accent");
+  }
+
   function sheetTemplate() {
     return '<div class="sheet-backdrop" id="sheetBackdrop"><div class="sheet">' +
       '<h2 id="sheetTitle">Neuer Eintrag</h2>' +
@@ -695,6 +733,7 @@
       '<button type="button" class="btn-secondary" id="moveOnMapBtn" style="width:100%;margin-bottom:12px">🗺️ Position auf Karte verschieben</button>' +
       '<div id="polygonSection" hidden>' +
         '<div class="form-hint" id="polygonStatus">Noch keine Fläche gezeichnet.</div>' +
+        '<button type="button" class="btn-secondary" id="editVerticesBtn" style="width:100%;margin-bottom:8px" hidden>✏️ Punkte bearbeiten</button>' +
         '<button type="button" class="btn-secondary" id="drawPolygonBtn" style="width:100%;margin-bottom:12px">🔷 Fläche auf Karte zeichnen</button>' +
       "</div>" +
       '<div id="dynamicFields"></div>' +
@@ -772,6 +811,7 @@
     document.getElementById("polygonStatus").textContent = n >= 3
       ? "Fläche mit " + n + " Punkten gezeichnet."
       : "Noch keine Fläche gezeichnet.";
+    document.getElementById("editVerticesBtn").hidden = n < 3;
     document.getElementById("drawPolygonBtn").textContent = n >= 3 ? "🔷 Fläche neu zeichnen" : "🔷 Fläche auf Karte zeichnen";
   }
 
@@ -861,12 +901,9 @@
     sheetEl.addEventListener("click", function (ev) { if (ev.target === sheetEl) closeSheet(); });
     document.getElementById("saveBtn").addEventListener("click", saveEntry);
     document.getElementById("locateBtn").addEventListener("click", useLocation);
-    document.getElementById("moveOnMapBtn").addEventListener("click", function () {
-      pickingLocation = true;
-      sheetEl.style.display = "none";
-      showToast("Tippe auf die neue Position auf der Karte");
-    });
+    document.getElementById("moveOnMapBtn").addEventListener("click", startPointMove);
     document.getElementById("drawPolygonBtn").addEventListener("click", startPolygonDrawing);
+    document.getElementById("editVerticesBtn").addEventListener("click", startVertexEditing);
   }
 
   function useLocation() {
@@ -942,16 +979,47 @@
 
   function closeSheet() {
     if (sheetEl) sheetEl.remove();
-    sheetEl = null; state.editingId = null; pickingLocation = false;
+    if (moveMarker) {
+      map.removeLayer(moveMarker); moveMarker = null;
+      if (state.editingId && markers[state.editingId]) markers[state.editingId].addTo(map);
+    }
+    sheetEl = null; state.editingId = null;
     if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
     endPolygonDrawing();
+    endVertexEditing();
+  }
+
+  function startPointMove() {
+    var lat = parseFloat(document.getElementById("f_lat").value);
+    var lng = parseFloat(document.getElementById("f_lng").value);
+    if (isNaN(lat) || isNaN(lng)) { showToast("Bitte zuerst eine Position setzen"); return; }
+    switchToMapTab();
+    if (sheetEl) sheetEl.style.display = "none";
+    if (moveMarker) { map.removeLayer(moveMarker); moveMarker = null; }
+    if (state.editingId && markers[state.editingId]) map.removeLayer(markers[state.editingId]);
+    var color = currentEntryColor();
+    moveMarker = L.marker([lat, lng], {
+      draggable: true,
+      icon: L.divIcon({ className: "", html: '<div class="vertex-handle move-handle" style="background:' + color + '"></div>', iconSize: [22, 22], iconAnchor: [11, 11] })
+    }).addTo(map);
+    moveMarker.on("dragend", function () {
+      var pos = moveMarker.getLatLng();
+      document.getElementById("f_lat").value = pos.lat.toFixed(6);
+      document.getElementById("f_lng").value = pos.lng.toFixed(6);
+      map.removeLayer(moveMarker);
+      moveMarker = null;
+      if (state.editingId && markers[state.editingId]) markers[state.editingId].addTo(map);
+      if (sheetEl) sheetEl.style.display = "";
+      showToast("Position aktualisiert");
+    });
+    showToast("Ziehe den Punkt an die neue Position");
   }
 
   function redrawDrawingPreview() {
     if (drawingPreviewLayer) { map.removeLayer(drawingPreviewLayer); drawingPreviewLayer = null; }
     drawingVertexLayer.clearLayers();
     if (!drawingPoints.length) return;
-    var color = cssVar("--accent") || "#0E6E7A";
+    var color = currentEntryColor() || "#0E6E7A";
     drawingPreviewLayer = (drawingPoints.length < 3
       ? L.polyline(drawingPoints, { color: color, weight: 3, dashArray: "5 6" })
       : L.polygon(drawingPoints, { color: color, weight: 3, dashArray: "5 6", fillOpacity: 0.18 })
@@ -1002,6 +1070,7 @@
   function startPolygonDrawing() {
     drawingPolygon = true;
     drawingPoints = [];
+    switchToMapTab();
     redrawDrawingPreview();
     if (sheetEl) sheetEl.style.display = "none";
     showDrawToolbar();
@@ -1027,6 +1096,116 @@
 
   function cancelPolygonDrawing() {
     endPolygonDrawing();
+  }
+
+  function updateMidpointPosition(i) {
+    var n = editingVertices.length;
+    var cur = editingVertices[i];
+    var next = editingVertices[(i + 1) % n];
+    midpointMarkers[i].setLatLng(L.latLng((cur.lat + next.lat) / 2, (cur.lng + next.lng) / 2));
+  }
+
+  function rebuildVertexEditorHandles() {
+    vertexHandleLayer.clearLayers();
+    midpointHandleLayer.clearLayers();
+    vertexMarkers = [];
+    midpointMarkers = [];
+    var color = currentEntryColor() || "#0E6E7A";
+    editingVertices.forEach(function (ll, i) {
+      var m = L.marker(ll, {
+        draggable: true,
+        icon: L.divIcon({ className: "", html: '<div class="vertex-handle"></div>', iconSize: [18, 18], iconAnchor: [9, 9] })
+      }).addTo(vertexHandleLayer);
+      m.on("drag", function () {
+        editingVertices[i] = m.getLatLng();
+        if (editingPolygonPreview) editingPolygonPreview.setLatLngs(editingVertices);
+        updateMidpointPosition((i - 1 + editingVertices.length) % editingVertices.length);
+        updateMidpointPosition(i);
+      });
+      m.on("click", function () {
+        if (editingVertices.length <= 3) { showToast("Mindestens 3 Punkte nötig"); return; }
+        editingVertices.splice(i, 1);
+        rebuildVertexEditorHandles();
+        if (editingPolygonPreview) editingPolygonPreview.setLatLngs(editingVertices);
+      });
+      vertexMarkers.push(m);
+    });
+    editingVertices.forEach(function (ll, i) {
+      var next = editingVertices[(i + 1) % editingVertices.length];
+      var mid = L.latLng((ll.lat + next.lat) / 2, (ll.lng + next.lng) / 2);
+      var mm = L.marker(mid, {
+        draggable: true,
+        icon: L.divIcon({ className: "", html: '<div class="vertex-handle vertex-handle-mid" style="border-color:' + color + '"></div>', iconSize: [14, 14], iconAnchor: [7, 7] })
+      }).addTo(midpointHandleLayer);
+      mm.on("dragend", function () {
+        editingVertices.splice(i + 1, 0, mm.getLatLng());
+        rebuildVertexEditorHandles();
+        if (editingPolygonPreview) editingPolygonPreview.setLatLngs(editingVertices);
+      });
+      midpointMarkers.push(mm);
+    });
+    updateEditVerticesToolbarHint();
+  }
+
+  function updateEditVerticesToolbarHint() {
+    if (!editVerticesToolbarEl) return;
+    document.getElementById("editVerticesHint").textContent =
+      editingVertices.length + " Punkte – ziehen zum Verschieben, kleinen Punkt ziehen für eine neue Ecke, antippen zum Entfernen.";
+  }
+
+  function showEditVerticesToolbar() {
+    removeEditVerticesToolbar();
+    editVerticesToolbarEl = document.createElement("div");
+    editVerticesToolbarEl.className = "draw-toolbar";
+    editVerticesToolbarEl.innerHTML =
+      '<div class="draw-toolbar-hint" id="editVerticesHint"></div>' +
+      '<div class="draw-toolbar-actions">' +
+        '<button type="button" class="btn-secondary" id="editVerticesCancelBtn">✕ Abbrechen</button>' +
+        '<button type="button" class="btn-primary" id="editVerticesDoneBtn">✅ Fertig</button>' +
+      "</div>";
+    document.body.appendChild(editVerticesToolbarEl);
+    document.getElementById("editVerticesCancelBtn").addEventListener("click", cancelVertexEditing);
+    document.getElementById("editVerticesDoneBtn").addEventListener("click", finishVertexEditing);
+    updateEditVerticesToolbarHint();
+  }
+
+  function removeEditVerticesToolbar() {
+    if (editVerticesToolbarEl) { editVerticesToolbarEl.remove(); editVerticesToolbarEl = null; }
+  }
+
+  function startVertexEditing() {
+    if (pendingPolygon.length < 3) { showToast("Keine Fläche zum Bearbeiten vorhanden"); return; }
+    editingVertices = pendingPolygon.map(function (p) { return L.latLng(p.lat, p.lng); });
+    editingPolygonVertices = true;
+    switchToMapTab();
+    if (sheetEl) sheetEl.style.display = "none";
+    var color = currentEntryColor() || "#0E6E7A";
+    editingPolygonPreview = L.polygon(editingVertices, { color: color, weight: 3, fillColor: color, fillOpacity: 0.18 }).addTo(map);
+    rebuildVertexEditorHandles();
+    showEditVerticesToolbar();
+    showToast("Punkte ziehen zum Verschieben, kleinen Punkt ziehen für eine neue Ecke");
+  }
+
+  function endVertexEditing() {
+    editingPolygonVertices = false;
+    editingVertices = [];
+    vertexHandleLayer.clearLayers();
+    midpointHandleLayer.clearLayers();
+    if (editingPolygonPreview) { map.removeLayer(editingPolygonPreview); editingPolygonPreview = null; }
+    removeEditVerticesToolbar();
+    if (sheetEl) sheetEl.style.display = "";
+  }
+
+  function finishVertexEditing() {
+    if (editingVertices.length < 3) { showToast("Mindestens 3 Punkte nötig"); return; }
+    pendingPolygon = editingVertices.map(function (ll) { return { lat: ll.lat, lng: ll.lng }; });
+    endVertexEditing();
+    updatePolygonStatus();
+    showToast("Änderungen übernommen – zum Speichern „Speichern“ tippen");
+  }
+
+  function cancelVertexEditing() {
+    endVertexEditing();
   }
 
   function showToast(msg) {
