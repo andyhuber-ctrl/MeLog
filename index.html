@@ -21,6 +21,9 @@
     --parking: #5D6E80; --parking-wash: #E7ECF1;
     --access: #7A5D9E; --access-wash: #EEE7F5;
     --danger: #B0392E;
+    --hotspot: #D9481F; --hotspot-wash: #FBE4DA;
+    --potspot: #3F8C4C; --potspot-wash: #DFF0DE;
+    --schutzzone-ganzjaehrig: #8B3A96; --schutzzone-zeitlich: #B87BC2; --schutzzone-wash: #F1E2F3;
     --shadow: 0 8px 24px -12px rgba(8, 40, 44, 0.28);
     --radius: 14px;
   }
@@ -33,6 +36,9 @@
       --parking: #9FB1C2; --parking-wash: #1B2530;
       --access: #C6ACE8; --access-wash: #251C33;
       --danger: #E2685C;
+      --hotspot: #F1875A; --hotspot-wash: #3D2015;
+      --potspot: #7ED18F; --potspot-wash: #173A1E;
+      --schutzzone-ganzjaehrig: #D08AD9; --schutzzone-zeitlich: #E6C7EC; --schutzzone-wash: #2E1E33;
       --shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.55);
     }
   }
@@ -86,19 +92,22 @@
   }
   .map-filter-row {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    z-index: 500; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
-    max-width: calc(100% - 120px);
+    z-index: 500; display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-start;
+    max-width: calc(100% - 120px); overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
+  .map-filter-row::-webkit-scrollbar { display: none; }
   .map-filter-chip {
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
     padding: 5px 12px; border-radius: 999px; font-size: 0.76rem; font-weight: 600;
-    color: var(--ink-faint); cursor: pointer; white-space: nowrap;
+    color: var(--ink-faint); cursor: pointer; white-space: nowrap; flex: 0 0 auto;
   }
   .map-filter-chip.active { color: #fff; border-color: transparent; }
   .map-filter-chip.active[data-type="spot"] { background: var(--accent); }
   .map-filter-chip.active[data-type="catch"] { background: var(--catch); color: #241800; }
   .map-filter-chip.active[data-type="parking"] { background: var(--parking); }
   .map-filter-chip.active[data-type="access"] { background: var(--access); }
+  .map-filter-chip.active[data-type="schutzzone"] { background: var(--schutzzone-ganzjaehrig); }
 
   .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
   .filter-row input[type="search"] { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; color: var(--ink); font-size: 0.9rem; }
@@ -108,10 +117,14 @@
   .card-top { display: flex; align-items: flex-start; gap: 10px; }
   .badge { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
   .badge.spot { background: var(--accent-wash); color: var(--accent); }
+  .badge.spot.hotspot { background: var(--hotspot-wash); color: var(--hotspot); }
+  .badge.spot.potspot { background: var(--potspot-wash); color: var(--potspot); }
   .badge.catch { background: var(--catch-wash); color: var(--catch); }
   .badge.catch.unlanded { background: transparent; border: 1.5px dashed var(--catch); }
   .badge.parking { background: var(--parking-wash); color: var(--parking); }
   .badge.access { background: var(--access-wash); color: var(--access); }
+  .badge.schutzzone { background: var(--schutzzone-wash); color: var(--schutzzone-ganzjaehrig); }
+  .badge.schutzzone.zeitlich { color: var(--schutzzone-zeitlich); }
   .card-body { flex: 1; min-width: 0; }
   .card-title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .card-title { font-weight: 700; }
@@ -130,8 +143,11 @@
   .pin-icon { width: 30px; height: 30px; position: relative; }
   .pin-icon .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); }
   .pin-icon.spot .dot { background: var(--accent); }
+  .pin-icon.spot.hotspot .dot { background: var(--hotspot); }
+  .pin-icon.spot.potspot .dot { background: var(--potspot); }
   .pin-icon.parking .dot { background: var(--parking); }
   .pin-icon.access .dot { background: var(--access); }
+  .pin-icon.schutzzone .dot { background: var(--schutzzone-ganzjaehrig); }
   .pin-icon.fish { width: 38px; height: 22px; display: flex; align-items: center; justify-content: center; }
   .pin-icon.fish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
   .pin-icon.fish.unlanded img { opacity: 0.5; filter: grayscale(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
@@ -151,6 +167,7 @@
   .type-opt[aria-pressed="true"].catch { background: var(--catch); border-color: var(--catch); color: #241800; }
   .type-opt[aria-pressed="true"].parking { background: var(--parking); border-color: var(--parking); color: #fff; }
   .type-opt[aria-pressed="true"].access { background: var(--access); border-color: var(--access); color: #fff; }
+  .type-opt[aria-pressed="true"].schutzzone { background: var(--schutzzone-ganzjaehrig); border-color: var(--schutzzone-ganzjaehrig); color: #fff; }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
   .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; color: var(--ink); font-size: 0.95rem; font-family: inherit; }
@@ -225,6 +242,7 @@
         <button type="button" class="map-filter-chip active" data-type="catch">F&auml;nge</button>
         <button type="button" class="map-filter-chip active" data-type="parking">Parken</button>
         <button type="button" class="map-filter-chip active" data-type="access">Zugang</button>
+        <button type="button" class="map-filter-chip active" data-type="schutzzone">Schutzzone</button>
       </div>
       <div class="map-hint">Tippen zum Anlegen &middot; Ziehen zum Bewegen &middot; Pinch/Scroll zum Zoomen</div>
     </div>
@@ -245,8 +263,32 @@
 (function () {
   "use strict";
 
-  var TYPE_LABEL = { spot: "Spot", catch: "Fang", parking: "Parken", access: "Zugang" };
-  var TYPE_ICON = { spot: "⊙", catch: "🐟", parking: "P", access: "→" };
+  var TYPE_LABEL = { spot: "Spot", catch: "Fang", parking: "Parken", access: "Zugang", schutzzone: "Schutzzone" };
+  var TYPE_ICON = { spot: "⊙", catch: "🐟", parking: "P", access: "→", schutzzone: "⛔" };
+  var SPOT_CLASSES = ["hotspot", "spot", "potspot"];
+  var SPOT_CLASS_LABEL = { hotspot: "Hotspot", spot: "Spot", potspot: "PotSpot" };
+  var ZONE_CLASSES = ["ganzjaehrig", "zeitlich"];
+  var ZONE_CLASS_LABEL = { ganzjaehrig: "Ganzjährig", zeitlich: "Zeitlich begrenzt" };
+  var ALWAYS_POLYGON_TYPES = { schutzzone: true };
+
+  function spotClassOf(e) {
+    if (e.spotClass) return e.spotClass;
+    if (e.name === "Hotspot") return "hotspot";
+    if (e.name === "PotSpot") return "potspot";
+    return "spot";
+  }
+  function zoneClassOf(e) {
+    return e.zoneClass || "ganzjaehrig";
+  }
+  function colorForEntry(e) {
+    if (e.type === "schutzzone") return cssVar(zoneClassOf(e) === "zeitlich" ? "--schutzzone-zeitlich" : "--schutzzone-ganzjaehrig");
+    if (e.type === "spot") {
+      var sc = spotClassOf(e);
+      if (sc === "hotspot") return cssVar("--hotspot");
+      if (sc === "potspot") return cssVar("--potspot");
+    }
+    return cssVar("--accent");
+  }
 
   var firebaseConfig = {
     apiKey: "AIzaSyCgSDuWUylUQM83fqHm4WCftsUKfeXnDv0",
@@ -325,6 +367,8 @@
   function cardTags(e) {
     var tags = [];
     if (e.type === "catch" && e.landed === false) tags.push("Nur Biss – nicht gelandet");
+    if (e.type === "spot" && spotClassOf(e) !== "spot") tags.push(SPOT_CLASS_LABEL[spotClassOf(e)]);
+    if (e.type === "schutzzone") tags.push(ZONE_CLASS_LABEL[zoneClassOf(e)]);
     if (hasPolygon(e)) tags.push("Fläche");
     if (e.method) tags.push(e.method);
     if (e.waterTempC != null) tags.push(e.waterTempC + "° Wasser");
@@ -348,10 +392,13 @@
     if (isCatch && e.date) metaBits.push(fmtDate(e.date));
     if (!isCatch && !hasPolygon(e)) metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
     if (e.createdBy) metaBits.push(e.createdBy);
+    var badgeExtra = e.type === "spot" && spotClassOf(e) !== "spot" ? " " + spotClassOf(e)
+      : e.type === "schutzzone" ? " " + zoneClassOf(e)
+      : "";
     return '' +
       '<div class="card" data-id="' + e.id + '">' +
         '<div class="card-top">' +
-          '<div class="badge ' + e.type + (e.type === "catch" && e.landed === false ? " unlanded" : "") + '">' + (e.type === "catch" ? '<img class="badge-fish-img" src="' + FISH_ICON_SRC + '" alt="" />' : TYPE_ICON[e.type]) + "</div>" +
+          '<div class="badge ' + e.type + badgeExtra + (e.type === "catch" && e.landed === false ? " unlanded" : "") + '">' + (e.type === "catch" ? '<img class="badge-fish-img" src="' + FISH_ICON_SRC + '" alt="" />' : TYPE_ICON[e.type]) + "</div>" +
           '<div class="card-body">' +
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
@@ -372,6 +419,7 @@
   function renderList() {
     var filtered = state.entries.filter(function (e) {
       if (state.tab === "parking") { if (e.type !== "parking" && e.type !== "access") return false; }
+      else if (state.tab === "spot") { if (e.type !== "spot" && e.type !== "schutzzone") return false; }
       else if (e.type !== state.tab) return false;
       if (state.search) {
         var hay = [e.name, e.notes, e.method, e.wind, e.weather].join(" ").toLowerCase();
@@ -412,7 +460,7 @@
   var markerLayer = L.layerGroup().addTo(map);
   var ghostMarker = null;
   var pickingLocation = false;
-  var mapTypeFilter = { spot: true, catch: true, parking: true, access: true };
+  var mapTypeFilter = { spot: true, catch: true, parking: true, access: true, schutzzone: true };
 
   var drawingPolygon = false;
   var drawingPoints = [];
@@ -434,9 +482,10 @@
         popupAnchor: [0, -10]
       });
     }
+    var extraClass = e.type === "spot" && spotClassOf(e) !== "spot" ? " " + spotClassOf(e) : "";
     return L.divIcon({
       className: "",
-      html: '<div class="pin-icon ' + e.type + '"><div class="dot"></div></div>',
+      html: '<div class="pin-icon ' + e.type + extraClass + '"><div class="dot"></div></div>',
       iconSize: [30, 30],
       iconAnchor: [15, 28],
       popupAnchor: [0, -26]
@@ -450,11 +499,11 @@
   function rebuildMarkers() {
     markerLayer.clearLayers();
     markers = {};
-    var areaColor = cssVar("--accent") || "#0E6E7A";
     var failed = [];
     state.entries.forEach(function (e) {
       if (!mapTypeFilter[e.type]) return;
       try {
+        var areaColor = colorForEntry(e) || "#0E6E7A";
         var layer = hasPolygon(e)
           ? L.polygon(polygonLatLngs(e), { color: areaColor, weight: 2, fillColor: areaColor, fillOpacity: 0.25 }).addTo(markerLayer)
           : L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
@@ -605,7 +654,7 @@
   searchInput.addEventListener("input", function (ev) { state.search = ev.target.value; renderList(); });
 
   // ---- add/edit sheet ----
-  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [] };
+  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [] };
   var SPECIES = ["Meerforelle", "Lachs", "Dorsch", "Hornhecht", "Hecht", "Barsch", "Scholle", "Flunder", "Aal", "Makrele", "Sonstige"];
   var METHOD_LEGACY = { "Fliege": "Fliegenfischen", "Spinnrute": "Spinnfischen" };
   var DYN_FIELD_HTML = {
@@ -622,6 +671,7 @@
   };
   var currentType = "spot", currentLanded = true, sheetEl = null;
   var currentGeometry = "point", pendingPolygon = [];
+  var currentSpotClass = "spot", currentZoneClass = "ganzjaehrig";
 
   function sheetTemplate() {
     return '<div class="sheet-backdrop" id="sheetBackdrop"><div class="sheet">' +
@@ -631,6 +681,7 @@
         '<button type="button" class="type-opt catch" data-type="catch">Fang</button>' +
         '<button type="button" class="type-opt parking" data-type="parking">Parken</button>' +
         '<button type="button" class="type-opt access" data-type="access">Zugang</button>' +
+        '<button type="button" class="type-opt schutzzone" data-type="schutzzone">Schutzzone</button>' +
       "</div>" +
       '<div id="nameFieldContainer"></div>' +
       '<div id="geomPickerContainer"></div>' +
@@ -700,6 +751,22 @@
       "</div></div>";
   }
 
+  function spotClassPickerHtml() {
+    return '<div class="field"><label>Kategorie</label><div class="type-picker" id="spotClassPicker">' +
+      SPOT_CLASSES.map(function (c) {
+        return '<button type="button" class="type-opt" data-class="' + c + '" aria-pressed="' + (currentSpotClass === c) + '">' + SPOT_CLASS_LABEL[c] + "</button>";
+      }).join("") +
+      "</div></div>";
+  }
+
+  function zoneClassPickerHtml() {
+    return '<div class="field"><label>Dauer</label><div class="type-picker" id="zoneClassPicker">' +
+      ZONE_CLASSES.map(function (c) {
+        return '<button type="button" class="type-opt" data-class="' + c + '" aria-pressed="' + (currentZoneClass === c) + '">' + ZONE_CLASS_LABEL[c] + "</button>";
+      }).join("") +
+      "</div></div>";
+  }
+
   function updatePolygonStatus() {
     var n = pendingPolygon.length;
     document.getElementById("polygonStatus").textContent = n >= 3
@@ -709,7 +776,7 @@
   }
 
   function updateGeometrySections() {
-    var isPolygonMode = currentType === "spot" && currentGeometry === "polygon";
+    var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType] || (currentType === "spot" && currentGeometry === "polygon");
     document.getElementById("coordsSection").hidden = currentType === "catch" || isPolygonMode;
     document.getElementById("moveOnMapBtn").hidden = isPolygonMode;
     document.getElementById("polygonSection").hidden = !isPolygonMode;
@@ -719,16 +786,33 @@
   function setType(type) {
     var previousName = document.getElementById("f_name") ? document.getElementById("f_name").value : null;
     currentType = type;
-    if (type !== "spot") currentGeometry = "point";
+    if (ALWAYS_POLYGON_TYPES[type]) currentGeometry = "polygon";
+    else if (type !== "spot") currentGeometry = "point";
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
     document.getElementById("nameFieldContainer").innerHTML = nameFieldHtml(type === "catch", type === "catch" ? previousName : null);
-    document.getElementById("geomPickerContainer").innerHTML = type === "spot" ? geomPickerHtml() : "";
+    var extraHtml = "";
+    if (type === "spot") extraHtml = spotClassPickerHtml() + geomPickerHtml();
+    else if (type === "schutzzone") extraHtml = zoneClassPickerHtml();
+    document.getElementById("geomPickerContainer").innerHTML = extraHtml;
     if (type === "spot") {
+      document.querySelectorAll("#spotClassPicker .type-opt").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          currentSpotClass = btn.getAttribute("data-class");
+          document.querySelectorAll("#spotClassPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-class") === currentSpotClass ? "true" : "false"); });
+        });
+      });
       document.querySelectorAll("#geomPicker .type-opt").forEach(function (btn) {
         btn.addEventListener("click", function () {
           currentGeometry = btn.getAttribute("data-geom");
           document.querySelectorAll("#geomPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-geom") === currentGeometry ? "true" : "false"); });
           updateGeometrySections();
+        });
+      });
+    } else if (type === "schutzzone") {
+      document.querySelectorAll("#zoneClassPicker .type-opt").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          currentZoneClass = btn.getAttribute("data-class");
+          document.querySelectorAll("#zoneClassPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-class") === currentZoneClass ? "true" : "false"); });
         });
       });
     }
@@ -755,7 +839,9 @@
     currentType = entry ? entry.type : (preset && preset.type) || "spot";
     currentLanded = entry ? entry.landed !== false : true;
     pendingPolygon = entry && entry.polygon ? entry.polygon.slice() : [];
-    currentGeometry = hasPolygon({ polygon: pendingPolygon }) ? "polygon" : "point";
+    currentGeometry = (ALWAYS_POLYGON_TYPES[currentType] || hasPolygon({ polygon: pendingPolygon })) ? "polygon" : "point";
+    currentSpotClass = entry ? spotClassOf(entry) : "spot";
+    currentZoneClass = entry ? zoneClassOf(entry) : "ganzjaehrig";
     document.getElementById("sheetTitle").textContent = entry ? "Eintrag bearbeiten" : "Neuer Eintrag";
     setType(currentType);
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
@@ -951,7 +1037,7 @@
   }
 
   function saveEntry() {
-    var isPolygonMode = currentType === "spot" && currentGeometry === "polygon";
+    var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType] || (currentType === "spot" && currentGeometry === "polygon");
     var lat, lng, polygon = null;
     if (isPolygonMode) {
       if (pendingPolygon.length < 3) { showToast("Bitte zuerst eine Fläche mit mindestens 3 Punkten zeichnen"); return; }
@@ -969,6 +1055,8 @@
       name: document.getElementById("f_name").value.trim() || TYPE_LABEL[currentType],
       lat: lat, lng: lng,
       polygon: polygon,
+      spotClass: currentType === "spot" ? currentSpotClass : null,
+      zoneClass: currentType === "schutzzone" ? currentZoneClass : null,
       notes: document.getElementById("f_notes").value.trim() || null
     };
     if (currentType === "catch") {
