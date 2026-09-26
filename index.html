@@ -186,7 +186,8 @@
 
   .fab { position: fixed; right: 18px; bottom: 22px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
   .fab-secondary { position: fixed; right: 22px; bottom: 88px; z-index: 900; background: var(--surface); color: var(--ink); border: 1px solid var(--border); width: 46px; height: 46px; border-radius: 50%; font-size: 1.15rem; box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .fab-photo-label { position: fixed; right: 45px; bottom: 126px; width: 210px; z-index: 899; pointer-events: none; }
+  .fab-photo-label { position: fixed; right: 0; bottom: 126px; width: 90px; z-index: 899; pointer-events: none; }
+  body.popup-open .fab, body.popup-open .fab-secondary, body.popup-open .fab-photo-label { display: none; }
 
   .pin-icon { width: 30px; height: 30px; position: relative; }
   .pin-icon .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); }
@@ -297,10 +298,10 @@
   </main>
 
   <div class="fab-photo-label" aria-hidden="true">
-    <svg viewBox="0 0 210 70" width="210" height="70">
-      <path id="fabPhotoArc" d="M8,62 A160,160 0 0,1 200,62" fill="none"/>
-      <text font-size="12" font-family="'Big Shoulders Display', system-ui, sans-serif" font-weight="700" letter-spacing="0.01em" fill="var(--catch)" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill">
-        <textPath href="#fabPhotoArc" startOffset="97%" text-anchor="end">FANG MIT FOTO EINTRAGEN!</textPath>
+    <svg viewBox="0 0 90 70" width="90" height="70">
+      <path id="fabPhotoArc" d="M4,58 A75,75 0 0,1 86,58" fill="none"/>
+      <text font-size="10" font-family="'Big Shoulders Display', system-ui, sans-serif" font-weight="700" letter-spacing="-0.01em" fill="var(--catch)" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill">
+        <textPath href="#fabPhotoArc" startOffset="50%" text-anchor="middle">FANG PER FOTO!</textPath>
       </text>
     </svg>
   </div>
@@ -792,6 +793,13 @@
     firstSnapshotHandled = false;
   }
 
+  map.on("popupopen", function () {
+    document.body.classList.add("popup-open");
+  });
+  map.on("popupclose", function () {
+    document.body.classList.remove("popup-open");
+  });
+
   map.on("click", function (ev) {
     if (drawingPolygon) {
       drawingPoints.push(ev.latlng);
@@ -1130,6 +1138,7 @@
   }
 
   function openSheet(entry, preset) {
+    map.closePopup();
     document.body.insertAdjacentHTML("beforeend", sheetTemplate());
     sheetEl = document.getElementById("sheetBackdrop");
     state.editingId = entry ? entry.id : null;
