@@ -184,12 +184,12 @@
   .pin-icon.spot .dot { background: var(--accent); }
   .pin-icon.spot.hotspot .dot { background: var(--hotspot); }
   .pin-icon.spot.potspot .dot { background: var(--potspot); }
-  .pin-icon.parking .dot { background: var(--parking); }
   .pin-icon.access .dot { background: var(--access); }
   .pin-icon.schutzzone .dot { background: var(--schutzzone-ganzjaehrig); }
   .pin-icon.fish { width: 38px; height: 22px; display: flex; align-items: center; justify-content: center; }
   .pin-icon.fish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
   .pin-icon.fish.unlanded img { opacity: 0.5; filter: grayscale(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+  .pin-icon.parking-img img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
   .badge-fish-img { width: 22px; height: 22px; object-fit: contain; }
   .badge.catch.unlanded .badge-fish-img { opacity: 0.55; filter: grayscale(0.8); }
   .leaflet-popup-content-wrapper { border-radius: var(--radius); background: var(--surface); color: var(--ink); }
@@ -306,6 +306,9 @@
   var MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
   var SUBSTRATE_TYPES = ["Steinig", "Sand", "Schlamm", "Kies", "Tang", "Seegras", "Muschelbank", "Sonstiges"];
   var SPECIES = ["Meerforelle", "Lachs", "Dorsch", "Hornhecht", "Hecht", "Barsch", "Scholle", "Flunder", "Aal", "Makrele", "Sonstige"];
+  var PARKING_CLASSES = ["tag", "nacht"];
+  var PARKING_CLASS_LABEL = { tag: "Tagsüber", nacht: "Übernachtung möglich" };
+  var PARKING_ICON_SRC = { tag: "icons/parken-tag.svg", nacht: "icons/parken-nacht.svg" };
 
   function spotClassOf(e) {
     if (e.spotClass) return e.spotClass;
@@ -315,6 +318,12 @@
   }
   function zoneClassOf(e) {
     return e.zoneClass || "ganzjaehrig";
+  }
+  function parkingClassOf(e) {
+    if (e.parkingClass) return e.parkingClass;
+    var text = ((e.name || "") + " " + (e.notes || "")).toLowerCase();
+    if (text.indexOf("camp") !== -1 || text.indexOf("übernacht") !== -1 || text.indexOf("wohnmobil") !== -1) return "nacht";
+    return "tag";
   }
   function colorForEntry(e) {
     if (e.type === "schutzzone") return cssVar(zoneClassOf(e) === "zeitlich" ? "--schutzzone-zeitlich" : "--schutzzone-ganzjaehrig");
@@ -548,6 +557,15 @@
         iconSize: [38, 22],
         iconAnchor: [19, 11],
         popupAnchor: [0, -10]
+      });
+    }
+    if (e.type === "parking") {
+      return L.divIcon({
+        className: "",
+        html: '<div class="pin-icon parking-img"><img src="' + PARKING_ICON_SRC[parkingClassOf(e)] + '" alt="" /></div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 28],
+        popupAnchor: [0, -26]
       });
     }
     var extraClass = e.type === "spot" && spotClassOf(e) !== "spot" ? " " + spotClassOf(e) : "";
@@ -834,6 +852,7 @@
   var currentGeometry = "point", pendingPolygon = [];
   var currentSpotClass = "spot", currentZoneClass = "ganzjaehrig";
   var currentGoodMonths = [], currentSubstrate = [];
+  var currentParkingClass = "tag";
 
   function currentEntryColor() {
     if (currentType === "schutzzone") return cssVar(currentZoneClass === "zeitlich" ? "--schutzzone-zeitlich" : "--schutzzone-ganzjaehrig");
@@ -943,6 +962,14 @@
       "</div></div>";
   }
 
+  function parkingClassPickerHtml() {
+    return '<div class="field"><label>Art</label><div class="type-picker" id="parkingClassPicker">' +
+      PARKING_CLASSES.map(function (c) {
+        return '<button type="button" class="type-opt" data-class="' + c + '" aria-pressed="' + (currentParkingClass === c) + '">' + PARKING_CLASS_LABEL[c] + "</button>";
+      }).join("") +
+      "</div></div>";
+  }
+
   function monthPickerHtml() {
     return '<div class="field"><label>Fängig in diesen Monaten</label><div class="type-picker" id="monthPicker">' +
       MONTHS.map(function (m) {
@@ -986,6 +1013,7 @@
     var extraHtml = "";
     if (type === "spot") extraHtml = spotClassPickerHtml() + geomPickerHtml() + monthPickerHtml() + substratePickerHtml();
     else if (type === "schutzzone") extraHtml = zoneClassPickerHtml();
+    else if (type === "parking") extraHtml = parkingClassPickerHtml();
     document.getElementById("geomPickerContainer").innerHTML = extraHtml;
     if (type === "spot") {
       document.querySelectorAll("#spotClassPicker .type-opt").forEach(function (btn) {
@@ -1024,6 +1052,13 @@
           document.querySelectorAll("#zoneClassPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-class") === currentZoneClass ? "true" : "false"); });
         });
       });
+    } else if (type === "parking") {
+      document.querySelectorAll("#parkingClassPicker .type-opt").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          currentParkingClass = btn.getAttribute("data-class");
+          document.querySelectorAll("#parkingClassPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-class") === currentParkingClass ? "true" : "false"); });
+        });
+      });
     }
     updateGeometrySections();
     if (type === "catch") {
@@ -1053,6 +1088,7 @@
     currentZoneClass = entry ? zoneClassOf(entry) : "ganzjaehrig";
     currentGoodMonths = entry && entry.goodMonths ? entry.goodMonths.slice() : [];
     currentSubstrate = entry && entry.substrate ? entry.substrate.slice() : [];
+    currentParkingClass = entry ? parkingClassOf(entry) : "tag";
     document.getElementById("sheetTitle").textContent = entry ? "Eintrag bearbeiten" : "Neuer Eintrag";
     setType(currentType);
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
@@ -1409,6 +1445,7 @@
       zoneClass: currentType === "schutzzone" ? currentZoneClass : null,
       goodMonths: currentType === "spot" ? currentGoodMonths.slice() : null,
       substrate: currentType === "spot" ? currentSubstrate.slice() : null,
+      parkingClass: currentType === "parking" ? currentParkingClass : null,
       notes: document.getElementById("f_notes").value.trim() || null
     };
     if (currentType === "catch") {
