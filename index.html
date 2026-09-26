@@ -31,7 +31,7 @@
     :root:not([data-theme="light"]) {
       --bg: #0A1A1D; --surface: #102428; --surface-2: #0D1F22;
       --ink: #E6F2F1; --ink-soft: #9FBCBC; --ink-faint: #6D8D8E; --border: #1E3C40;
-      --accent: #4FC6D1; --accent-strong: #8CE0E8; --accent-wash: #123338;
+      --accent: #4FC6D1; --accent-wash: #123338;
       --catch: #E3A63D; --catch-wash: #33270F;
       --parking: #9FB1C2; --parking-wash: #1B2530;
       --access: #C6ACE8; --access-wash: #251C33;
@@ -167,9 +167,12 @@
   .card-title { font-weight: 700; }
   .card-meta { font-size: 0.76rem; color: var(--ink-soft); }
   .card-stat { font-family: "JetBrains Mono", monospace; font-weight: 700; color: var(--catch); }
-  .card-photo-link { display: block; margin-top: 8px; }
+  .card-photo-link { display: block; margin-top: 8px; cursor: pointer; }
   .card-photo { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; display: block; }
   .card-photo.card-photo-popup { width: 84px; height: 84px; max-height: 84px; }
+  .photo-lightbox { position: fixed; inset: 0; z-index: 3000; background: rgba(6, 14, 16, 0.9); display: flex; align-items: center; justify-content: center; padding: 28px; }
+  .photo-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+  .photo-lightbox-close { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,0.15); color: #fff; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .photo-preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; display: block; }
   .card-notes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
   .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -183,6 +186,7 @@
 
   .fab { position: fixed; right: 18px; bottom: 22px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
   .fab-secondary { position: fixed; right: 22px; bottom: 88px; z-index: 900; background: var(--surface); color: var(--ink); border: 1px solid var(--border); width: 46px; height: 46px; border-radius: 50%; font-size: 1.15rem; box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .fab-photo-label { position: fixed; right: 4px; bottom: 126px; width: 180px; z-index: 899; pointer-events: none; }
 
   .pin-icon { width: 30px; height: 30px; position: relative; }
   .pin-icon .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); }
@@ -292,6 +296,14 @@
     </div>
   </main>
 
+  <div class="fab-photo-label" aria-hidden="true">
+    <svg viewBox="0 0 180 70" width="180" height="70">
+      <path id="fabPhotoArc" d="M10,60 A130,130 0 0,1 170,60" fill="none"/>
+      <text font-size="12.5" font-family="'Big Shoulders Display', system-ui, sans-serif" font-weight="700" letter-spacing="0.01em" fill="var(--catch)" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill">
+        <textPath href="#fabPhotoArc" startOffset="50%" text-anchor="middle">FANG MIT FOTO EINTRAGEN!</textPath>
+      </text>
+    </svg>
+  </div>
   <button class="fab-secondary" id="fabPhotoCatch" aria-label="Fang per Foto anlegen" title="Fang per Foto anlegen">📷</button>
   <input type="file" id="quickCatchPhotoInput" accept="image/*" hidden />
   <button class="fab" id="fabAdd" aria-label="Neuer Eintrag">+</button>
@@ -461,7 +473,7 @@
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
             (metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "") +
-            (e.photo ? '<a class="card-photo-link" href="' + e.photo + '" target="_blank" rel="noopener"><img class="card-photo' + (isPopup ? " card-photo-popup" : "") + '" src="' + e.photo + '" alt="" /></a>' : "") +
+            (e.photo ? '<div class="card-photo-link" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo' + (isPopup ? " card-photo-popup" : "") + '" src="' + e.photo + '" alt="" /></div>' : "") +
             (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
             (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
             '<div class="card-actions' + (isPopup ? " card-actions-compact" : "") + '">' +
@@ -795,6 +807,24 @@
     openSheet(null, { lat: ev.latlng.lat, lng: ev.latlng.lng, type: "spot" });
   });
 
+  function openPhotoLightbox(photoUrl) {
+    if (!photoUrl) return;
+    var overlay = document.createElement("div");
+    overlay.className = "photo-lightbox";
+    var img = document.createElement("img");
+    img.src = photoUrl;
+    img.alt = "";
+    var closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "photo-lightbox-close";
+    closeBtn.setAttribute("aria-label", "Schließen");
+    closeBtn.textContent = "✕";
+    overlay.appendChild(img);
+    overlay.appendChild(closeBtn);
+    overlay.addEventListener("click", function () { overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+
   // event delegation for popup + list actions (both use .card markup)
   document.addEventListener("click", function (ev) {
     var card = ev.target.closest(".card");
@@ -806,6 +836,7 @@
     if (ev.target.closest(".delete-btn")) {
       if (confirm('"' + entry.name + '" wirklich löschen?')) deleteEntry(entry);
     }
+    if (ev.target.closest(".card-photo-link")) openPhotoLightbox(entry.photo);
     if (ev.target.closest(".locate-on-map")) {
       document.querySelectorAll(".tab-btn").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-tab") === "map" ? "true" : "false"); });
       state.tab = "map";
