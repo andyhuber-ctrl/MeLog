@@ -221,6 +221,9 @@
   .field label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
   .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; color: var(--ink); font-size: 0.95rem; font-family: inherit; }
   .field textarea { min-height: 60px; resize: vertical; }
+  .checkbox-field { display: flex; align-items: center; gap: 8px; }
+  .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--accent); background: none; border: none; padding: 0; }
+  .checkbox-field label { display: inline; font-size: 0.95rem; font-weight: 500; color: var(--ink); text-transform: none; letter-spacing: normal; margin: 0; cursor: pointer; }
   .field-row { display: flex; gap: 10px; }
   .field-row .field { flex: 1; min-width: 0; }
   .form-hint { font-size: 0.74rem; color: var(--ink-faint); margin: -6px 0 12px; }
@@ -445,6 +448,7 @@
     }
     if (e.method) tags.push(e.method);
     if (e.bait) tags.push(e.bait);
+    if (e.marked) tags.push("🏷️ Markiert" + (e.markingNote ? ": " + e.markingNote : ""));
     if (e.airTempC != null) tags.push(e.airTempC + "° Luft");
     if (e.waterTempC != null) tags.push(e.waterTempC + "° Wasser");
     if (e.windDirection || e.windSpeedKmh != null) {
@@ -506,7 +510,7 @@
       else if (state.tab === "spot") { if (e.type !== "spot" && e.type !== "schutzzone") return false; }
       else if (e.type !== state.tab) return false;
       if (state.search) {
-        var hay = [e.name, e.notes, e.method, e.bait, e.wind, e.weather].join(" ").toLowerCase();
+        var hay = [e.name, e.notes, e.method, e.bait, e.markingNote, e.wind, e.weather].join(" ").toLowerCase();
         if (hay.indexOf(state.search.toLowerCase()) === -1) return false;
       }
       return true;
@@ -1056,6 +1060,8 @@
     var preservedLength = document.getElementById("f_length") ? document.getElementById("f_length").value : null;
     var preservedBait = document.getElementById("f_bait") ? document.getElementById("f_bait").value : null;
     var preservedBaitOther = document.getElementById("f_bait_other") ? document.getElementById("f_bait_other").value : null;
+    var preservedMarked = document.getElementById("f_marked") ? document.getElementById("f_marked").checked : false;
+    var preservedMarkingNote = document.getElementById("f_marking_note") ? document.getElementById("f_marking_note").value : null;
 
     var order = ["dateTime", "method", "bait", "envFetch", "tempRow", "windRow", "weatherRow", "salinityPct"];
     var topRow = currentLanded
@@ -1064,11 +1070,16 @@
           '<div class="field"><label for="f_count">Anzahl</label><input id="f_count" type="number" inputmode="numeric" value="1" /></div>' +
         "</div>"
       : nameFieldHtml(true, preservedName);
+    var markingRow = currentLanded
+      ? '<div class="field"><div class="checkbox-field"><input type="checkbox" id="f_marked" /><label for="f_marked">Markierung vorhanden</label></div>' +
+          '<input type="text" id="f_marking_note" placeholder="z.B. Fettflosse abgeschnitten, Sendemarke Nr. …" hidden style="margin-top:8px" /></div>'
+      : "";
     var html = '<div class="field"><label>Ergebnis</label><div class="type-picker" id="landedPicker">' +
       '<button type="button" class="type-opt" data-landed="true" aria-pressed="' + (currentLanded === true) + '">Gelandet</button>' +
       '<button type="button" class="type-opt" data-landed="false" aria-pressed="' + (currentLanded === false) + '">Nur Biss</button>' +
       "</div></div>" +
       topRow +
+      markingRow +
       order.map(function (f) { return DYN_FIELD_HTML[f] || ""; }).join("");
     document.getElementById("dynamicFields").innerHTML = html;
     SHARED_CATCH_FIELDS.forEach(function (k) {
@@ -1077,6 +1088,17 @@
     });
     if (currentLanded && document.getElementById("f_length") && preservedLength) {
       document.getElementById("f_length").value = preservedLength;
+    }
+    var markedEl = document.getElementById("f_marked");
+    if (markedEl) {
+      markedEl.checked = preservedMarked;
+      var markingNoteEl = document.getElementById("f_marking_note");
+      markingNoteEl.hidden = !preservedMarked;
+      if (preservedMarkingNote) markingNoteEl.value = preservedMarkingNote;
+      markedEl.addEventListener("change", function () {
+        markingNoteEl.hidden = !markedEl.checked;
+        if (markedEl.checked) markingNoteEl.focus();
+      });
     }
     document.getElementById("envFetchBtn").addEventListener("click", fetchEnvironmentData);
     document.querySelectorAll("#landedPicker .type-opt").forEach(function (btn) {
@@ -1239,6 +1261,13 @@
     if (lengthEl) lengthEl.value = lengthEntryToInputValue(entry);
     updateBaitField(entry.bait, null);
     updateWindKnotsHint();
+    var markedEl = document.getElementById("f_marked");
+    if (markedEl && entry.marked) {
+      markedEl.checked = true;
+      var markingNoteEl = document.getElementById("f_marking_note");
+      markingNoteEl.hidden = false;
+      markingNoteEl.value = entry.markingNote || "";
+    }
   }
 
   function openSheet(entry, preset) {
@@ -2039,6 +2068,9 @@
       var baitSelectVal = baitWrap && !baitWrap.hidden ? g("f_bait") : "";
       var baitOtherVal = g("f_bait_other");
       data.bait = (baitSelectVal === "Sonstiges" && baitOtherVal) ? baitOtherVal : (baitSelectVal || null);
+      var markedEl = document.getElementById("f_marked");
+      data.marked = currentLanded && !!(markedEl && markedEl.checked);
+      data.markingNote = data.marked ? (g("f_marking_note").trim() || null) : null;
     }
     var saveBtn = document.getElementById("saveBtn");
     saveBtn.disabled = true;
