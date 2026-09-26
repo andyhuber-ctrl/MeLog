@@ -169,6 +169,7 @@
   .card-stat { font-family: "JetBrains Mono", monospace; font-weight: 700; color: var(--catch); }
   .card-photo-link { display: block; margin-top: 8px; }
   .card-photo { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; display: block; }
+  .card-photo.card-photo-popup { width: 84px; height: 84px; max-height: 84px; }
   .photo-preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; display: block; }
   .card-notes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
   .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -460,7 +461,7 @@
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
             (metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "") +
-            (e.photo ? '<a class="card-photo-link" href="' + e.photo + '" target="_blank" rel="noopener"><img class="card-photo" src="' + e.photo + '" alt="" /></a>' : "") +
+            (e.photo ? '<a class="card-photo-link" href="' + e.photo + '" target="_blank" rel="noopener"><img class="card-photo' + (isPopup ? " card-photo-popup" : "") + '" src="' + e.photo + '" alt="" /></a>' : "") +
             (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
             (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
             '<div class="card-actions' + (isPopup ? " card-actions-compact" : "") + '">' +
