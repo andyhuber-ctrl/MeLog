@@ -177,8 +177,8 @@
   .card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .card-actions a, .card-actions button { font-size: 0.78rem; text-decoration: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
   .card-actions .danger { color: var(--danger); border-color: var(--danger); background: transparent; }
-  .card-actions-compact { justify-content: flex-end; }
-  .card-actions-compact .icon-btn { width: 32px; height: 32px; padding: 0; border-radius: 50%; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+  .card-actions-compact { justify-content: flex-end; gap: 12px; }
+  .card-actions-compact .icon-btn { width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; }
   .empty-state { text-align: center; padding: 40px 16px; color: var(--ink-faint); }
 
   .fab { position: fixed; right: 18px; bottom: 22px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
@@ -850,9 +850,10 @@
     method: '<div class="field"><label for="f_method">Methode</label><select id="f_method"><option value="">–</option><option>Fliegenfischen</option><option>Spinnfischen</option><option>Sonstiges</option></select></div>',
     lengthCm: '<div class="field"><label for="f_length">Länge (cm)</label><input id="f_length" type="number" inputmode="numeric" /></div>',
     countFish: '<div class="field"><label for="f_count">Anzahl Fische</label><input id="f_count" type="number" inputmode="numeric" value="1" /></div>',
-    envFetch: '<button type="button" class="btn-secondary" id="envFetchBtn" style="width:100%;margin-bottom:12px">🌊 Wind &amp; Wassertemperatur automatisch laden</button><div class="form-hint" id="envFetchHint">Aus öffentlichen Wetterdaten (Open-Meteo), basierend auf Ort, Datum &amp; Uhrzeit. Salzgehalt ist darüber leider nicht verfügbar – bitte weiter manuell eintragen.</div>',
+    envFetch: '<button type="button" class="btn-secondary" id="envFetchBtn" style="width:100%;margin-bottom:12px">🌊 Wetterdaten automatisch laden</button><div class="form-hint" id="envFetchHint">Wind, Wetter, Luftdruck &amp; Wassertemperatur aus öffentlichen Wetterdaten (Open-Meteo), basierend auf Ort, Datum &amp; Uhrzeit. Salzgehalt ist darüber leider nicht verfügbar – bitte weiter manuell eintragen.</div>',
     waterTempC: '<div class="field"><label for="f_temp">Wassertemp. (°C)</label><input id="f_temp" type="number" inputmode="numeric" /></div>',
     wind: '<div class="field"><label for="f_wind">Wind</label><input id="f_wind" type="text" placeholder="z.B. Ost, 3 Bft" /></div>',
+    pressure: '<div class="field"><label for="f_pressure">Luftdruck (hPa)</label><input id="f_pressure" type="number" inputmode="decimal" step="0.1" /></div>',
     salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>',
     weather: '<div class="field"><label for="f_weather">Wetter</label><input id="f_weather" type="text" placeholder="sonnig, wolkig …" /></div>'
   };
@@ -922,8 +923,8 @@
     "</div></div>";
   }
 
-  var CATCH_FIELD_IDS = { date: "f_date", time: "f_time", method: "f_method", lengthCm: "f_length", countFish: "f_count", waterTempC: "f_temp", wind: "f_wind", salinityPct: "f_sal", weather: "f_weather" };
-  var SHARED_CATCH_FIELDS = ["date", "time", "method", "waterTempC", "wind", "salinityPct", "weather"];
+  var CATCH_FIELD_IDS = { date: "f_date", time: "f_time", method: "f_method", lengthCm: "f_length", countFish: "f_count", waterTempC: "f_temp", wind: "f_wind", pressure: "f_pressure", salinityPct: "f_sal", weather: "f_weather" };
+  var SHARED_CATCH_FIELDS = ["date", "time", "method", "waterTempC", "wind", "pressure", "salinityPct", "weather"];
 
   function renderCatchFields() {
     var preserve = {};
@@ -931,7 +932,7 @@
       var el = document.getElementById(CATCH_FIELD_IDS[k]);
       if (el) preserve[k] = el.value;
     });
-    var order = ["date", "time", "method"].concat(currentLanded ? ["lengthCm", "countFish"] : []).concat(["envFetch", "waterTempC", "wind", "salinityPct", "weather"]);
+    var order = ["date", "time", "method"].concat(currentLanded ? ["lengthCm", "countFish"] : []).concat(["envFetch", "waterTempC", "wind", "pressure", "weather", "salinityPct"]);
     var html = '<div class="field"><label>Ergebnis</label><div class="type-picker" id="landedPicker">' +
       '<button type="button" class="type-opt" data-landed="true" aria-pressed="' + (currentLanded === true) + '">Gelandet</button>' +
       '<button type="button" class="type-opt" data-landed="false" aria-pressed="' + (currentLanded === false) + '">Nur Biss</button>' +
@@ -1518,6 +1519,19 @@
     return dirs[Math.round(deg / 45) % 8];
   }
 
+  var WEATHER_CODE_LABEL = {
+    0: "Klarer Himmel", 1: "Überwiegend klar", 2: "Teilweise bewölkt", 3: "Bedeckt",
+    45: "Nebel", 48: "Reifnebel",
+    51: "Leichter Nieselregen", 53: "Nieselregen", 55: "Starker Nieselregen",
+    56: "Leichter gefrierender Nieselregen", 57: "Gefrierender Nieselregen",
+    61: "Leichter Regen", 63: "Regen", 65: "Starker Regen",
+    66: "Leichter gefrierender Regen", 67: "Gefrierender Regen",
+    71: "Leichter Schneefall", 73: "Schneefall", 75: "Starker Schneefall", 77: "Schneegriesel",
+    80: "Leichte Regenschauer", 81: "Regenschauer", 82: "Heftige Regenschauer",
+    85: "Leichte Schneeschauer", 86: "Schneeschauer",
+    95: "Gewitter", 96: "Gewitter mit leichtem Hagel", 99: "Gewitter mit starkem Hagel"
+  };
+
   function fetchEnvironmentData() {
     var date = document.getElementById("f_date").value;
     var time = document.getElementById("f_time").value || "12:00";
@@ -1532,7 +1546,7 @@
     var hourKey = date + "T" + time.slice(0, 2) + ":00";
     var tz = "Europe%2FBerlin";
     var windUrl = "https://archive-api.open-meteo.com/v1/archive?latitude=" + lat + "&longitude=" + lng +
-      "&start_date=" + date + "&end_date=" + date + "&hourly=wind_speed_10m,wind_direction_10m&timezone=" + tz;
+      "&start_date=" + date + "&end_date=" + date + "&hourly=wind_speed_10m,wind_direction_10m,weathercode,pressure_msl&timezone=" + tz;
     var seaUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + lat + "&longitude=" + lng +
       "&start_date=" + date + "&end_date=" + date + "&hourly=sea_surface_temperature&timezone=" + tz;
 
@@ -1550,6 +1564,16 @@
         if (speed != null && dir != null) {
           document.getElementById("f_wind").value = Math.round(speed) + " km/h aus " + degToCompass(dir);
           filled.push("Wind");
+        }
+        var code = wind.hourly.weathercode ? wind.hourly.weathercode[idx] : null;
+        if (code != null && WEATHER_CODE_LABEL[code]) {
+          document.getElementById("f_weather").value = WEATHER_CODE_LABEL[code];
+          filled.push("Wetter");
+        }
+        var pressure = wind.hourly.pressure_msl ? wind.hourly.pressure_msl[idx] : null;
+        if (pressure != null) {
+          document.getElementById("f_pressure").value = Math.round(pressure * 10) / 10;
+          filled.push("Luftdruck");
         }
       }
       if (sea && sea.hourly && sea.hourly.time) {
@@ -1851,6 +1875,7 @@
       data.countFish = currentLanded ? (g("f_count") ? parseInt(g("f_count"), 10) : 1) : null;
       data.waterTempC = g("f_temp") ? parseInt(g("f_temp"), 10) : null;
       data.wind = g("f_wind") || null;
+      data.pressure = g("f_pressure") ? parseFloat(g("f_pressure")) : null;
       data.salinityPct = g("f_sal") || null;
       data.weather = g("f_weather") || null;
     }
