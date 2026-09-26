@@ -1168,22 +1168,33 @@
     }, { timeout: 8000 });
   }
 
+  function drawSourceToJpeg(source, srcW, srcH, maxDim, quality) {
+    var w = srcW, h = srcH;
+    if (w > maxDim || h > maxDim) {
+      if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+      else { w = Math.round(w * maxDim / h); h = maxDim; }
+    }
+    var canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(source, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", quality);
+  }
+
   function compressImageOnce(file, maxDim, quality) {
+    // Bevorzugt createImageBitmap: decodiert direkt aus der Datei (kein Umweg über eine
+    // data:-URL), was für HEIC-Fotos in Safari zuverlässiger ist als über ein <img>-Element.
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: "from-image" }).then(function (bitmap) {
+        var dataUrl = drawSourceToJpeg(bitmap, bitmap.width, bitmap.height, maxDim, quality);
+        bitmap.close();
+        return dataUrl;
+      });
+    }
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
       reader.onload = function (e) {
         var img = new Image();
-        img.onload = function () {
-          var w = img.width, h = img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
-            else { w = Math.round(w * maxDim / h); h = maxDim; }
-          }
-          var canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL("image/jpeg", quality));
-        };
+        img.onload = function () { resolve(drawSourceToJpeg(img, img.width, img.height, maxDim, quality)); };
         img.onerror = function () { reject(new Error("Bild konnte nicht gelesen werden")); };
         img.src = e.target.result;
       };
@@ -1846,6 +1857,7 @@
     var saveBtn = document.getElementById("saveBtn");
     saveBtn.disabled = true;
     saveBtn.textContent = "Speichert …";
+    var wasNewEntry = !state.editingId;
     var promise;
     if (state.editingId) {
       data.updatedAt = new Date().toISOString();
@@ -1858,6 +1870,10 @@
     promise.then(function () {
       closeSheet();
       showToast("Gespeichert");
+      if (wasNewEntry) {
+        switchToMapTab();
+        map.setView([data.lat, data.lng], Math.max(map.getZoom(), 14));
+      }
     }).catch(function (err) {
       saveBtn.disabled = false;
       saveBtn.textContent = "Speichern";
