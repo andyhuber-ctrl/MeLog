@@ -167,6 +167,9 @@
   .card-title { font-weight: 700; }
   .card-meta { font-size: 0.76rem; color: var(--ink-soft); }
   .card-stat { font-family: "JetBrains Mono", monospace; font-weight: 700; color: var(--catch); }
+  .card-photo-link { display: block; margin-top: 8px; }
+  .card-photo { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; display: block; }
+  .photo-preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; display: block; }
   .card-notes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
   .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .tag { font-size: 0.72rem; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-soft); padding: 2px 8px; border-radius: 999px; }
@@ -454,6 +457,7 @@
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
             (metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "") +
+            (e.photo ? '<a class="card-photo-link" href="' + e.photo + '" target="_blank" rel="noopener"><img class="card-photo" src="' + e.photo + '" alt="" /></a>' : "") +
             (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
             (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "") +
             '<div class="card-actions' + (isPopup ? " card-actions-compact" : "") + '">' +
@@ -853,6 +857,8 @@
   var currentSpotClass = "spot", currentZoneClass = "ganzjaehrig";
   var currentGoodMonths = [], currentSubstrate = [];
   var currentParkingClass = "tag";
+  var currentPhoto = null, photoProcessing = false, photoRequestId = 0;
+  var PHOTO_MAX_BYTES = 650000;
 
   function currentEntryColor() {
     if (currentType === "schutzzone") return cssVar(currentZoneClass === "zeitlich" ? "--schutzzone-zeitlich" : "--schutzzone-ganzjaehrig");
@@ -893,6 +899,16 @@
         '<button type="button" class="btn-secondary" id="drawPolygonBtn" style="width:100%;margin-bottom:12px">🔷 Fläche auf Karte zeichnen</button>' +
       "</div>" +
       '<div id="dynamicFields"></div>' +
+      '<div class="field">' +
+        '<label>Foto</label>' +
+        '<div id="photoPreviewWrap" hidden>' +
+          '<img id="photoPreview" class="photo-preview" alt="" />' +
+          '<button type="button" class="btn-secondary" id="removePhotoBtn" style="width:100%;margin-top:6px">🗑️ Foto entfernen</button>' +
+        "</div>" +
+        '<button type="button" class="btn-secondary" id="addPhotoBtn" style="width:100%">📷 Foto hinzufügen</button>' +
+        '<input type="file" id="photoInput" accept="image/*" capture="environment" hidden />' +
+        '<div class="form-hint" id="photoHint"></div>' +
+      "</div>" +
       '<div class="field"><label for="f_notes">Notizen</label><textarea id="f_notes" placeholder="Köder, Bedingungen, Beobachtungen …"></textarea></div>' +
       '<div class="sheet-actions">' +
         '<button type="button" class="btn-secondary" id="cancelBtn">Abbrechen</button>' +
@@ -1089,6 +1105,9 @@
     currentGoodMonths = entry && entry.goodMonths ? entry.goodMonths.slice() : [];
     currentSubstrate = entry && entry.substrate ? entry.substrate.slice() : [];
     currentParkingClass = entry ? parkingClassOf(entry) : "tag";
+    currentPhoto = entry && entry.photo ? entry.photo : null;
+    photoProcessing = false;
+    photoRequestId++;
     document.getElementById("sheetTitle").textContent = entry ? "Eintrag bearbeiten" : "Neuer Eintrag";
     setType(currentType);
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
@@ -1111,6 +1130,19 @@
     document.getElementById("moveOnMapBtn").addEventListener("click", startPointMove);
     document.getElementById("drawPolygonBtn").addEventListener("click", startPolygonDrawing);
     document.getElementById("editVerticesBtn").addEventListener("click", startVertexEditing);
+    updatePhotoPreview();
+    document.getElementById("addPhotoBtn").addEventListener("click", function () {
+      document.getElementById("photoInput").click();
+    });
+    document.getElementById("photoInput").addEventListener("change", function (ev) {
+      var file = ev.target.files && ev.target.files[0];
+      handlePhotoFile(file);
+      ev.target.value = "";
+    });
+    document.getElementById("removePhotoBtn").addEventListener("click", function () {
+      currentPhoto = null;
+      updatePhotoPreview();
+    });
   }
 
   function useLocation() {
@@ -1125,6 +1157,78 @@
       btn.textContent = "Standort nicht verfügbar";
       setTimeout(function () { btn.textContent = "📍 Aktuellen Standort verwenden"; }, 2000);
     }, { timeout: 8000 });
+  }
+
+  function compressImageOnce(file, maxDim, quality) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+          var w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          var canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = function () { reject(new Error("Bild konnte nicht gelesen werden")); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function () { reject(new Error("Datei konnte nicht gelesen werden")); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function compressImageToLimit(file, maxBytes) {
+    var maxDim = 1000, quality = 0.7;
+    function attempt() {
+      return compressImageOnce(file, maxDim, quality).then(function (dataUrl) {
+        if (dataUrl.length <= maxBytes || (quality <= 0.35 && maxDim <= 500)) return dataUrl;
+        if (quality > 0.35) quality -= 0.15; else maxDim = Math.round(maxDim * 0.75);
+        return attempt();
+      });
+    }
+    return attempt();
+  }
+
+  function updatePhotoPreview() {
+    var wrap = document.getElementById("photoPreviewWrap");
+    var addBtn = document.getElementById("addPhotoBtn");
+    if (!wrap || !addBtn) return;
+    if (currentPhoto) {
+      document.getElementById("photoPreview").src = currentPhoto;
+      wrap.hidden = false;
+      addBtn.textContent = "📷 Foto ändern";
+    } else {
+      wrap.hidden = true;
+      addBtn.textContent = "📷 Foto hinzufügen";
+    }
+  }
+
+  function handlePhotoFile(file) {
+    if (!file) return;
+    var myId = ++photoRequestId;
+    var hint = document.getElementById("photoHint");
+    photoProcessing = true;
+    if (hint) hint.textContent = "Komprimiere Foto …";
+    compressImageToLimit(file, PHOTO_MAX_BYTES).then(function (dataUrl) {
+      if (myId !== photoRequestId) return;
+      currentPhoto = dataUrl;
+      updatePhotoPreview();
+      var h = document.getElementById("photoHint");
+      if (h) h.textContent = "";
+    }).catch(function () {
+      if (myId !== photoRequestId) return;
+      var h = document.getElementById("photoHint");
+      if (h) h.textContent = "Foto konnte nicht verarbeitet werden";
+    }).finally(function () {
+      if (myId !== photoRequestId) return;
+      photoProcessing = false;
+    });
   }
 
   function degToCompass(deg) {
@@ -1423,6 +1527,7 @@
   }
 
   function saveEntry() {
+    if (photoProcessing) { showToast("Foto wird noch komprimiert – bitte kurz warten"); return; }
     var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType] || (currentType === "spot" && currentGeometry === "polygon");
     var lat, lng, polygon = null;
     if (isPolygonMode) {
@@ -1446,6 +1551,7 @@
       goodMonths: currentType === "spot" ? currentGoodMonths.slice() : null,
       substrate: currentType === "spot" ? currentSubstrate.slice() : null,
       parkingClass: currentType === "parking" ? currentParkingClass : null,
+      photo: currentPhoto || null,
       notes: document.getElementById("f_notes").value.trim() || null
     };
     if (currentType === "catch") {
