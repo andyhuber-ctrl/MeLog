@@ -61,17 +61,20 @@
     flex: 0 0 auto; z-index: 20;
     background: var(--accent-strong); color: #F3FBFA;
     padding: 10px 16px; box-shadow: var(--shadow);
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
   }
-  .topbar-title { display: flex; align-items: baseline; gap: 10px; }
-  .topbar-title h1 { font-size: 1.3rem; margin: 0; color: #F3FBFA; }
-  .topbar-sub { font-size: 0.68rem; color: #AEE0E2; letter-spacing: 0.06em; text-transform: uppercase; }
-  .profile-avatar { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 0.7rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-family: "Source Sans 3", sans-serif; padding: 0; flex: 0 0 auto; }
+  .topbar-title { display: flex; flex-direction: column; justify-self: start; min-width: 0; line-height: 1.2; }
+  .topbar-title h1 { font-size: 1.25rem; margin: 0; color: #F3FBFA; }
+  .topbar-sub { font-size: 0.62rem; color: #AEE0E2; letter-spacing: 0.03em; white-space: nowrap; }
+  .profile-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; justify-self: end; }
   .field input:disabled { opacity: 0.6; }
-  .stats { display: flex; gap: 8px; overflow-x: auto; }
-  .stat-chip { flex: 0 0 auto; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 4px 10px; }
-  .stat-chip .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 0.95rem; color: #F3FBFA; display: block; }
+  .stats { display: flex; gap: 8px; justify-self: center; }
+  .stat-chip { flex: 0 0 auto; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 4px 10px; text-align: center; }
+  .stat-chip .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 0.95rem; color: #F3FBFA; display: block; white-space: nowrap; }
   .stat-chip .lbl { font-size: 0.6rem; color: #AEE0E2; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-chip-pb { background: rgba(255, 196, 64, 0.22); border-color: rgba(255, 196, 64, 0.6); }
+  .stat-chip-pb .val, .stat-chip-pb .lbl { color: #FFD166; }
+  .stat-chip-pb .val { font-size: 1rem; }
 
   nav.tabs { flex: 0 0 auto; display: flex; gap: 6px; background: var(--surface); padding: 8px 16px; border-bottom: 1px solid var(--border); }
   .tab-btn { border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); padding: 6px 14px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
@@ -256,11 +259,11 @@
 <div id="app" hidden>
   <header class="topbar">
     <div class="topbar-title">
-      <h1>Meerforellen&#8209;Log</h1>
-      <span class="topbar-sub" id="viewerNote">&hellip;</span>
-      <button type="button" id="profileBtn" class="profile-avatar" aria-label="Profil">?</button>
+      <h1>MeLog</h1>
+      <span class="topbar-sub">das Meerforellen&#8209;Logbuch</span>
     </div>
     <div class="stats" id="statsRow"></div>
+    <button type="button" id="profileBtn" class="profile-avatar" aria-label="Profil">&#128100;</button>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -377,24 +380,22 @@
   }
 
   function renderStats() {
+    var spots = state.entries.filter(function (e) { return e.type === "spot"; }).length;
     var catches = state.entries.filter(function (e) { return e.type === "catch"; });
     var landedCatches = catches.filter(function (e) { return e.landed !== false; });
-    var bites = catches.length - landedCatches.length;
-    var totalFish = landedCatches.reduce(function (s, e) { return s + (e.countFish || 1); }, 0);
-    var lengths = [];
-    landedCatches.forEach(function (e) { if (e.lengthCm) lengths.push(e.lengthCm); if (e.lengthMaxCm) lengths.push(e.lengthMaxCm); });
-    var biggest = lengths.length ? Math.max.apply(null, lengths) : null;
-    var spots = state.entries.filter(function (e) { return e.type === "spot"; }).length;
+    var pbEntry = null, pbLength = 0;
+    landedCatches.forEach(function (e) {
+      var len = e.lengthMaxCm || e.lengthCm || 0;
+      if (len > pbLength) { pbLength = len; pbEntry = e; }
+    });
+    var pbText = pbEntry ? escapeHtml(pbEntry.name) + " " + pbLength + " cm" : "–";
     var chips = [
-      { val: totalFish, lbl: "Fische" },
-      { val: biggest ? biggest + " cm" : "–", lbl: "Größte" },
-      { val: bites, lbl: "Bisse" },
       { val: spots, lbl: "Spots" },
-      { val: state.entries.length, lbl: "Gesamt" }
+      { val: catches.length, lbl: "Fänge" }
     ];
     statsRow.innerHTML = chips.map(function (c) {
       return '<div class="stat-chip"><span class="val mono">' + c.val + '</span><span class="lbl">' + c.lbl + '</span></div>';
-    }).join("");
+    }).join("") + '<div class="stat-chip stat-chip-pb"><span class="val mono">🏆 ' + pbText + '</span><span class="lbl">Personal Best</span></div>';
   }
 
   function cardTags(e) {
@@ -1523,9 +1524,7 @@
     var action = authMode === "signin"
       ? auth.signInWithEmailAndPassword(email, pass)
       : auth.createUserWithEmailAndPassword(email, pass).then(function (cred) {
-          return cred.user.updateProfile({ displayName: name }).then(function () {
-            updateProfileBadge(cred.user);
-          });
+          return cred.user.updateProfile({ displayName: name });
         });
     action.catch(function (err) {
       showAuthError(authErrorMessage(err));
@@ -1536,11 +1535,6 @@
   });
 
   // ---- profile sheet ----
-  function initialsFor(user) {
-    var base = (user.displayName || user.email || "?").trim();
-    return base.charAt(0).toUpperCase();
-  }
-
   function importPolygonsFromKml() {
     var btn = document.getElementById("importPolygonsBtn");
     var original = btn.textContent;
@@ -1599,7 +1593,6 @@
       btn.disabled = true;
       btn.textContent = "Speichert …";
       user.updateProfile({ displayName: newName }).then(function () {
-        updateProfileBadge(user);
         showToast("Gespeichert");
         close();
       }).catch(function () {
@@ -1611,17 +1604,11 @@
   }
   document.getElementById("profileBtn").addEventListener("click", openProfileSheet);
 
-  function updateProfileBadge(user) {
-    document.getElementById("viewerNote").textContent = user.displayName || user.email;
-    document.getElementById("profileBtn").textContent = initialsFor(user);
-  }
-
   auth.onAuthStateChanged(function (user) {
     authLoadingEl.hidden = true;
     if (user) {
       authScreenEl.hidden = true;
       appEl.hidden = false;
-      updateProfileBadge(user);
       subscribeEntries();
     } else {
       appEl.hidden = true;
