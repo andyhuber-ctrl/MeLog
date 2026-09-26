@@ -1271,8 +1271,115 @@
     return null;
   }
 
+  function readAscii4(view, offset) {
+    return String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2), view.getUint8(offset + 3));
+  }
+
+  function readIsoBoxes(view, start, end) {
+    var boxes = {};
+    var offset = start;
+    while (offset + 8 <= end) {
+      var size = view.getUint32(offset, false);
+      var type = readAscii4(view, offset + 4);
+      var headerLen = 8;
+      var boxSize = size;
+      if (size === 1) {
+        if (offset + 16 > end) break;
+        var hi = view.getUint32(offset + 8, false), lo = view.getUint32(offset + 12, false);
+        boxSize = hi === 0 ? lo : (end - offset);
+        headerLen = 16;
+      } else if (size === 0) {
+        boxSize = end - offset;
+      }
+      if (boxSize < headerLen || offset + boxSize > end) break;
+      if (!boxes[type]) boxes[type] = { dataOffset: offset + headerLen, end: offset + boxSize };
+      offset += boxSize;
+    }
+    return boxes;
+  }
+
+  function readIsoUint(view, offset, size) {
+    if (size === 0) return 0;
+    if (size === 2) return view.getUint16(offset, false);
+    if (size === 4) return view.getUint32(offset, false);
+    if (size === 8) {
+      var hi = view.getUint32(offset, false), lo = view.getUint32(offset + 4, false);
+      return hi === 0 ? lo : Number.MAX_SAFE_INTEGER;
+    }
+    return 0;
+  }
+
+  function findHeicExifItem(view) {
+    if (view.byteLength < 12 || readAscii4(view, 4) !== "ftyp") return null;
+    var top = readIsoBoxes(view, 0, view.byteLength);
+    var meta = top.meta;
+    if (!meta) return null;
+    var metaChildren = readIsoBoxes(view, meta.dataOffset + 4, meta.end);
+    var iinf = metaChildren.iinf, iloc = metaChildren.iloc;
+    if (!iinf || !iloc) return null;
+
+    var iinfVersion = view.getUint8(iinf.dataOffset);
+    var p = iinf.dataOffset + 4;
+    var entryCount = iinfVersion === 0 ? view.getUint16(p, false) : view.getUint32(p, false);
+    p += iinfVersion === 0 ? 2 : 4;
+    var exifItemId = null;
+    for (var i = 0; i < entryCount && p + 8 <= iinf.end; i++) {
+      var infeSize = view.getUint32(p, false);
+      if (infeSize < 8) break;
+      if (readAscii4(view, p + 4) === "infe") {
+        var infeVersion = view.getUint8(p + 8);
+        var q = p + 12;
+        if (infeVersion >= 2) {
+          var itemId = infeVersion === 2 ? view.getUint16(q, false) : view.getUint32(q, false);
+          q += infeVersion === 2 ? 2 : 4;
+          q += 2;
+          if (readAscii4(view, q) === "Exif") exifItemId = itemId;
+        }
+      }
+      p += infeSize;
+    }
+    if (exifItemId == null) return null;
+
+    var ilocVersion = view.getUint8(iloc.dataOffset);
+    var r = iloc.dataOffset + 4;
+    var sizesByte1 = view.getUint8(r); r += 1;
+    var offsetSize = sizesByte1 >> 4, lengthSize = sizesByte1 & 0x0F;
+    var sizesByte2 = view.getUint8(r); r += 1;
+    var baseOffsetSize = sizesByte2 >> 4, indexSize = sizesByte2 & 0x0F;
+    var itemCount = ilocVersion < 2 ? view.getUint16(r, false) : view.getUint32(r, false);
+    r += ilocVersion < 2 ? 2 : 4;
+
+    for (var j = 0; j < itemCount; j++) {
+      var itemId2 = ilocVersion < 2 ? view.getUint16(r, false) : view.getUint32(r, false);
+      r += ilocVersion < 2 ? 2 : 4;
+      if (ilocVersion === 1 || ilocVersion === 2) r += 2;
+      r += 2;
+      var baseOffset = readIsoUint(view, r, baseOffsetSize); r += baseOffsetSize;
+      var extentCount = view.getUint16(r, false); r += 2;
+      var firstOffset = 0, firstLength = 0;
+      for (var k = 0; k < extentCount; k++) {
+        if ((ilocVersion === 1 || ilocVersion === 2) && indexSize > 0) r += indexSize;
+        var extOffset = readIsoUint(view, r, offsetSize); r += offsetSize;
+        var extLength = readIsoUint(view, r, lengthSize); r += lengthSize;
+        if (k === 0) { firstOffset = extOffset; firstLength = extLength; }
+      }
+      if (itemId2 === exifItemId) {
+        return { offset: baseOffset + firstOffset, length: firstLength };
+      }
+    }
+    return null;
+  }
+
+  function findHeicExifTiffStart(view) {
+    var item = findHeicExifItem(view);
+    if (!item || item.offset + 4 > view.byteLength) return null;
+    var tiffHeaderOffset = view.getUint32(item.offset, false);
+    return item.offset + 4 + tiffHeaderOffset;
+  }
+
   function parseExifGpsAndDate(view) {
     var tiffStart = findExifTiffStart(view);
+    if (tiffStart == null) tiffStart = findHeicExifTiffStart(view);
     if (tiffStart == null) return null;
     var byteOrder = view.getUint16(tiffStart);
     var little = byteOrder === 0x4949;
@@ -1312,16 +1419,16 @@
         } catch (err) { resolve(null); }
       };
       reader.onerror = function () { resolve(null); };
-      reader.readAsArrayBuffer(file.slice(0, 262144));
+      reader.readAsArrayBuffer(file);
     });
   }
 
   function applyExifIfEmpty(exif) {
     var filled = [];
-    if (!exif) return filled;
     var isPolygonModeNow = !!ALWAYS_POLYGON_TYPES[currentType] || (currentType === "spot" && currentGeometry === "polygon");
-    var positionUpForGrabs = !state.editingId && !positionTouchedByUser;
-    if (!isPolygonModeNow && positionUpForGrabs && exif.lat != null && exif.lng != null) {
+    var positionEligible = !isPolygonModeNow && !state.editingId && !positionTouchedByUser;
+    var hasExifPosition = !!(exif && exif.lat != null && exif.lng != null);
+    if (positionEligible && hasExifPosition) {
       var latEl = document.getElementById("f_lat"), lngEl = document.getElementById("f_lng");
       if (latEl && lngEl) {
         latEl.value = exif.lat.toFixed(6);
@@ -1329,13 +1436,13 @@
         filled.push("Position");
       }
     }
-    if (currentType === "catch") {
+    if (exif && currentType === "catch") {
       var dateEl = document.getElementById("f_date");
       if (dateEl && !dateEl.value && exif.date) { dateEl.value = exif.date; filled.push("Datum"); }
       var timeEl = document.getElementById("f_time");
       if (timeEl && !timeEl.value && exif.time) { timeEl.value = exif.time; filled.push("Uhrzeit"); }
     }
-    return filled;
+    return { filled: filled, noPosition: positionEligible && !hasExifPosition };
   }
 
   function updatePhotoPreview() {
@@ -1358,16 +1465,32 @@
     var hint = document.getElementById("photoHint");
     photoProcessing = true;
     if (hint) hint.textContent = "Komprimiere Foto …";
+    var compressPromise = compressImageToLimit(file, PHOTO_MAX_BYTES).then(
+      function (dataUrl) { return { ok: true, value: dataUrl }; },
+      function () { return { ok: false }; }
+    );
     Promise.all([
-      compressImageToLimit(file, PHOTO_MAX_BYTES),
+      compressPromise,
       readPhotoExif(file)
     ]).then(function (results) {
       if (myId !== photoRequestId) return;
-      currentPhoto = results[0];
-      updatePhotoPreview();
-      var filled = applyExifIfEmpty(results[1]);
+      var compressResult = results[0];
+      var exifResult = applyExifIfEmpty(results[1]);
+      var messages = [];
+      if (compressResult.ok) {
+        currentPhoto = compressResult.value;
+        updatePhotoPreview();
+      } else {
+        messages.push("Foto konnte nicht verarbeitet werden");
+      }
+      if (exifResult.filled.length) {
+        messages.push(exifResult.filled.join(" & ") + " aus Foto übernommen");
+      }
+      if (exifResult.noPosition) {
+        messages.push("Kein Standort im Foto gefunden – bei Mediathek-Fotos ggf. in „Optionen“ Standort aktivieren, sonst bitte manuell setzen");
+      }
       var h = document.getElementById("photoHint");
-      if (h) h.textContent = filled.length ? (filled.join(" & ") + " aus Foto übernommen") : "";
+      if (h) h.textContent = messages.join(" – ");
     }).catch(function () {
       if (myId !== photoRequestId) return;
       var h = document.getElementById("photoHint");
