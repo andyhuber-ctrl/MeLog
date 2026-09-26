@@ -186,7 +186,7 @@
 
   .fab { position: fixed; right: 18px; bottom: 22px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
   .fab-secondary { position: fixed; right: 22px; bottom: 88px; z-index: 900; background: var(--surface); color: var(--ink); border: 1px solid var(--border); width: 46px; height: 46px; border-radius: 50%; font-size: 1.15rem; box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .fab-photo-label { position: fixed; right: 4px; bottom: 126px; width: 180px; z-index: 899; pointer-events: none; }
+  .fab-photo-label { position: fixed; right: 45px; bottom: 126px; width: 210px; z-index: 899; pointer-events: none; }
 
   .pin-icon { width: 30px; height: 30px; position: relative; }
   .pin-icon .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); }
@@ -297,10 +297,10 @@
   </main>
 
   <div class="fab-photo-label" aria-hidden="true">
-    <svg viewBox="0 0 180 70" width="180" height="70">
-      <path id="fabPhotoArc" d="M10,60 A130,130 0 0,1 170,60" fill="none"/>
-      <text font-size="12.5" font-family="'Big Shoulders Display', system-ui, sans-serif" font-weight="700" letter-spacing="0.01em" fill="var(--catch)" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill">
-        <textPath href="#fabPhotoArc" startOffset="50%" text-anchor="middle">FANG MIT FOTO EINTRAGEN!</textPath>
+    <svg viewBox="0 0 210 70" width="210" height="70">
+      <path id="fabPhotoArc" d="M8,62 A160,160 0 0,1 200,62" fill="none"/>
+      <text font-size="12" font-family="'Big Shoulders Display', system-ui, sans-serif" font-weight="700" letter-spacing="0.01em" fill="var(--catch)" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill">
+        <textPath href="#fabPhotoArc" startOffset="97%" text-anchor="end">FANG MIT FOTO EINTRAGEN!</textPath>
       </text>
     </svg>
   </div>
@@ -1940,8 +1940,8 @@
   function deleteEntry(entry) {
     db.collection("entries").doc(entry.id).delete().then(function () {
       showToast("Gelöscht");
-    }).catch(function () {
-      showToast("Konnte nicht gelöscht werden");
+    }).catch(function (err) {
+      showToast("Konnte nicht gelöscht werden: " + (err && err.message ? err.message : "unbekannter Fehler"));
     });
   }
 
