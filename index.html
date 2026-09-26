@@ -326,6 +326,10 @@
   var MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
   var SUBSTRATE_TYPES = ["Steinig", "Sand", "Schlamm", "Kies", "Tang", "Seegras", "Muschelbank", "Sonstiges"];
   var SPECIES = ["Meerforelle", "Lachs", "Dorsch", "Hornhecht", "Hecht", "Barsch", "Scholle", "Flunder", "Aal", "Makrele", "Sonstige"];
+  var FLY_PATTERNS = ["Pattegrisen", "Polar Magnus", "Kobberbassen", "Pfannenfüller", "Woolly Bugger", "Tangloppen", "Vaskebjørnen", "Nightskater", "Sonstiges"];
+  var LURES = ["Spöket", "Hansen Flash", "Hansen Stripper", "Møre Silda", "Snaps", "Tobis", "Hansen Fight", "Eisele Eitz", "Sonstiges"];
+  var WIND_DIRECTIONS = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+  var WEATHER_OPTIONS = ["Sonnig", "Leicht bewölkt", "Bewölkt", "Bedeckt", "Nebel", "Regen", "Schauer", "Gewitter", "Schnee"];
   var PARKING_CLASSES = ["tag", "nacht"];
   var PARKING_CLASS_LABEL = { tag: "Tagsüber", nacht: "Übernachtung möglich" };
   var PARKING_ICON_SRC = { tag: "icons/parken-tag.svg", nacht: "icons/parken-nacht.svg" };
@@ -440,8 +444,15 @@
       tags.push(SUBSTRATE_TYPES.filter(function (s) { return e.substrate.indexOf(s) !== -1; }).join(", "));
     }
     if (e.method) tags.push(e.method);
+    if (e.bait) tags.push(e.bait);
+    if (e.airTempC != null) tags.push(e.airTempC + "° Luft");
     if (e.waterTempC != null) tags.push(e.waterTempC + "° Wasser");
-    if (e.wind) tags.push("Wind " + e.wind);
+    if (e.windDirection || e.windSpeedKmh != null) {
+      tags.push("Wind " + [e.windDirection, e.windSpeedKmh != null ? e.windSpeedKmh + " km/h" : null].filter(Boolean).join(" "));
+    } else if (e.wind) {
+      tags.push("Wind " + e.wind);
+    }
+    if (e.pressure != null) tags.push(e.pressure + " hPa");
     if (e.salinityPct) tags.push(e.salinityPct + "% Salz");
     if (e.weather) tags.push(e.weather);
     return tags;
@@ -453,7 +464,7 @@
     var statLine = "";
     if (e.type === "catch") {
       if (e.lengthMinCm && e.lengthMaxCm) statLine = e.lengthMinCm + "–" + e.lengthMaxCm + " cm";
-      else if (e.lengthCm) statLine = e.lengthCm + "+ cm";
+      else if (e.lengthCm) statLine = e.lengthCm + (e.lengthApprox !== false ? "+" : "") + " cm";
       if (e.countFish && e.countFish > 1) statLine = e.countFish + "× " + statLine;
     }
     var tags = cardTags(e);
@@ -495,7 +506,7 @@
       else if (state.tab === "spot") { if (e.type !== "spot" && e.type !== "schutzzone") return false; }
       else if (e.type !== state.tab) return false;
       if (state.search) {
-        var hay = [e.name, e.notes, e.method, e.wind, e.weather].join(" ").toLowerCase();
+        var hay = [e.name, e.notes, e.method, e.bait, e.wind, e.weather].join(" ").toLowerCase();
         if (hay.indexOf(state.search.toLowerCase()) === -1) return false;
       }
       return true;
@@ -884,17 +895,30 @@
   var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [] };
   var METHOD_LEGACY = { "Fliege": "Fliegenfischen", "Spinnrute": "Spinnfischen" };
   var DYN_FIELD_HTML = {
-    date: '<div class="field"><label for="f_date">Datum</label><input id="f_date" type="date" /></div>',
-    time: '<div class="field"><label for="f_time">Uhrzeit</label><input id="f_time" type="time" /></div>',
+    dateTime: '<div class="field-row">' +
+      '<div class="field"><label for="f_date">Datum</label><input id="f_date" type="date" /></div>' +
+      '<div class="field"><label for="f_time">Uhrzeit</label><input id="f_time" type="time" /></div>' +
+    "</div>",
     method: '<div class="field"><label for="f_method">Methode</label><select id="f_method"><option value="">–</option><option>Fliegenfischen</option><option>Spinnfischen</option><option>Sonstiges</option></select></div>',
-    lengthCm: '<div class="field"><label for="f_length">Länge (cm)</label><input id="f_length" type="number" inputmode="numeric" /></div>',
-    countFish: '<div class="field"><label for="f_count">Anzahl Fische</label><input id="f_count" type="number" inputmode="numeric" value="1" /></div>',
-    envFetch: '<button type="button" class="btn-secondary" id="envFetchBtn" style="width:100%;margin-bottom:12px">🌊 Wetterdaten automatisch laden</button><div class="form-hint" id="envFetchHint">Wind, Wetter, Luftdruck &amp; Wassertemperatur aus öffentlichen Wetterdaten (Open-Meteo), basierend auf Ort, Datum &amp; Uhrzeit. Salzgehalt ist darüber leider nicht verfügbar – bitte weiter manuell eintragen.</div>',
-    waterTempC: '<div class="field"><label for="f_temp">Wassertemp. (°C)</label><input id="f_temp" type="number" inputmode="numeric" /></div>',
-    wind: '<div class="field"><label for="f_wind">Wind</label><input id="f_wind" type="text" placeholder="z.B. Ost, 3 Bft" /></div>',
-    pressure: '<div class="field"><label for="f_pressure">Luftdruck (hPa)</label><input id="f_pressure" type="number" inputmode="decimal" step="0.1" /></div>',
-    salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>',
-    weather: '<div class="field"><label for="f_weather">Wetter</label><input id="f_weather" type="text" placeholder="sonnig, wolkig …" /></div>'
+    bait: '<div class="field" id="baitFieldWrap" hidden><label id="baitLabel" for="f_bait">Köder</label><select id="f_bait"></select><input type="text" id="f_bait_other" placeholder="Welches?" hidden style="margin-top:6px" /></div>',
+    envFetch: '<button type="button" class="btn-secondary" id="envFetchBtn" style="width:100%;margin-bottom:12px">🌊 Wetterdaten automatisch laden</button><div class="form-hint" id="envFetchHint">Wind, Wetter, Luftdruck, Luft- &amp; Wassertemperatur aus öffentlichen Wetterdaten (Open-Meteo), basierend auf Ort, Datum &amp; Uhrzeit. Salzgehalt ist darüber leider nicht verfügbar – bitte weiter manuell eintragen.</div>',
+    tempRow: '<div class="field-row">' +
+      '<div class="field"><label for="f_air_temp">Lufttemp. (°C)</label><input id="f_air_temp" type="number" inputmode="numeric" /></div>' +
+      '<div class="field"><label for="f_temp">Wassertemp. (°C)</label><input id="f_temp" type="number" inputmode="numeric" /></div>' +
+    "</div>",
+    windRow: '<div class="field-row">' +
+      '<div class="field"><label for="f_wind_dir">Windrichtung</label><select id="f_wind_dir"><option value="">–</option>' +
+        WIND_DIRECTIONS.map(function (d) { return "<option>" + d + "</option>"; }).join("") +
+      "</select></div>" +
+      '<div class="field"><label for="f_wind_speed">Wind (km/h)</label><input id="f_wind_speed" type="number" inputmode="numeric" /><div class="form-hint" id="windSpeedKnHint"></div></div>' +
+    "</div>",
+    weatherRow: '<div class="field-row">' +
+      '<div class="field"><label for="f_weather">Wetter</label><select id="f_weather"><option value="">–</option>' +
+        WEATHER_OPTIONS.map(function (w) { return "<option>" + w + "</option>"; }).join("") +
+      "</select></div>" +
+      '<div class="field"><label for="f_pressure">Luftdruck (hPa)</label><input id="f_pressure" type="number" inputmode="decimal" step="0.1" /></div>' +
+    "</div>",
+    salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>'
   };
   var currentType = "spot", currentLanded = true, sheetEl = null;
   var currentGeometry = "point", pendingPolygon = [];
@@ -962,8 +986,65 @@
     "</div></div>";
   }
 
-  var CATCH_FIELD_IDS = { date: "f_date", time: "f_time", method: "f_method", lengthCm: "f_length", countFish: "f_count", waterTempC: "f_temp", wind: "f_wind", pressure: "f_pressure", salinityPct: "f_sal", weather: "f_weather" };
-  var SHARED_CATCH_FIELDS = ["date", "time", "method", "waterTempC", "wind", "pressure", "salinityPct", "weather"];
+  var CATCH_FIELD_IDS = { date: "f_date", time: "f_time", method: "f_method", countFish: "f_count", airTempC: "f_air_temp", waterTempC: "f_temp", windDirection: "f_wind_dir", windSpeedKmh: "f_wind_speed", pressure: "f_pressure", salinityPct: "f_sal", weather: "f_weather" };
+  var SHARED_CATCH_FIELDS = ["date", "time", "method", "countFish", "airTempC", "waterTempC", "windDirection", "windSpeedKmh", "pressure", "salinityPct", "weather"];
+
+  function parseLengthInput(raw) {
+    raw = (raw || "").trim().replace(",", ".");
+    if (!raw) return { lengthCm: null, lengthApprox: false, lengthMinCm: null, lengthMaxCm: null };
+    var rangeMatch = /^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/.exec(raw);
+    if (rangeMatch) return { lengthCm: null, lengthApprox: false, lengthMinCm: parseFloat(rangeMatch[1]), lengthMaxCm: parseFloat(rangeMatch[2]) };
+    var plusMatch = /^(\d+(?:\.\d+)?)\s*\+$/.exec(raw);
+    if (plusMatch) return { lengthCm: parseFloat(plusMatch[1]), lengthApprox: true, lengthMinCm: null, lengthMaxCm: null };
+    var plainMatch = /^(\d+(?:\.\d+)?)$/.exec(raw);
+    if (plainMatch) return { lengthCm: parseFloat(plainMatch[1]), lengthApprox: false, lengthMinCm: null, lengthMaxCm: null };
+    return { lengthCm: null, lengthApprox: false, lengthMinCm: null, lengthMaxCm: null };
+  }
+
+  function lengthEntryToInputValue(entry) {
+    if (entry.lengthMinCm != null && entry.lengthMaxCm != null) return entry.lengthMinCm + "-" + entry.lengthMaxCm;
+    if (entry.lengthCm != null) return entry.lengthCm + (entry.lengthApprox !== false ? "+" : "");
+    return "";
+  }
+
+  function updateWindKnotsHint() {
+    var input = document.getElementById("f_wind_speed");
+    var hint = document.getElementById("windSpeedKnHint");
+    if (!input || !hint) return;
+    var kmh = parseFloat(input.value);
+    hint.textContent = isNaN(kmh) ? "" : "≈ " + (Math.round(kmh / 1.852 * 10) / 10) + " kn";
+  }
+
+  function updateBaitField(presetValue, presetOtherValue) {
+    var wrap = document.getElementById("baitFieldWrap");
+    var select = document.getElementById("f_bait");
+    var otherInput = document.getElementById("f_bait_other");
+    var label = document.getElementById("baitLabel");
+    if (!wrap || !select) return;
+    var methodEl = document.getElementById("f_method");
+    var method = methodEl ? methodEl.value : "";
+    var list = method === "Fliegenfischen" ? FLY_PATTERNS : method === "Spinnfischen" ? LURES : null;
+    if (!list) {
+      wrap.hidden = true;
+      return;
+    }
+    wrap.hidden = false;
+    label.textContent = method === "Fliegenfischen" ? "Fliegenmuster" : "Köder";
+    select.innerHTML = '<option value="">–</option>' + list.map(function (x) { return "<option>" + x + "</option>"; }).join("");
+    select.onchange = function () {
+      otherInput.hidden = select.value !== "Sonstiges";
+      if (!otherInput.hidden) otherInput.focus();
+    };
+    if (presetValue && list.indexOf(presetValue) === -1) {
+      select.value = "Sonstiges";
+      otherInput.hidden = false;
+      otherInput.value = presetValue;
+    } else {
+      select.value = presetValue || "";
+      otherInput.hidden = select.value !== "Sonstiges";
+      if (presetOtherValue) otherInput.value = presetOtherValue;
+    }
+  }
 
   function renderCatchFields() {
     var preserve = {};
@@ -971,17 +1052,32 @@
       var el = document.getElementById(CATCH_FIELD_IDS[k]);
       if (el) preserve[k] = el.value;
     });
-    var order = ["date", "time", "method"].concat(currentLanded ? ["lengthCm", "countFish"] : []).concat(["envFetch", "waterTempC", "wind", "pressure", "weather", "salinityPct"]);
+    var preservedName = document.getElementById("f_name") ? document.getElementById("f_name").value : null;
+    var preservedLength = document.getElementById("f_length") ? document.getElementById("f_length").value : null;
+    var preservedBait = document.getElementById("f_bait") ? document.getElementById("f_bait").value : null;
+    var preservedBaitOther = document.getElementById("f_bait_other") ? document.getElementById("f_bait_other").value : null;
+
+    var order = ["dateTime", "method", "bait", "envFetch", "tempRow", "windRow", "weatherRow", "salinityPct"];
+    var topRow = currentLanded
+      ? '<div class="field-row">' + nameFieldHtml(true, preservedName) +
+          '<div class="field"><label for="f_length">Länge (cm)</label><input id="f_length" type="text" placeholder="45 / 45+ / 40-50" /></div>' +
+          '<div class="field"><label for="f_count">Anzahl</label><input id="f_count" type="number" inputmode="numeric" value="1" /></div>' +
+        "</div>"
+      : nameFieldHtml(true, preservedName);
     var html = '<div class="field"><label>Ergebnis</label><div class="type-picker" id="landedPicker">' +
       '<button type="button" class="type-opt" data-landed="true" aria-pressed="' + (currentLanded === true) + '">Gelandet</button>' +
       '<button type="button" class="type-opt" data-landed="false" aria-pressed="' + (currentLanded === false) + '">Nur Biss</button>' +
       "</div></div>" +
+      topRow +
       order.map(function (f) { return DYN_FIELD_HTML[f] || ""; }).join("");
     document.getElementById("dynamicFields").innerHTML = html;
     SHARED_CATCH_FIELDS.forEach(function (k) {
       var el = document.getElementById(CATCH_FIELD_IDS[k]);
       if (el && preserve[k]) el.value = preserve[k];
     });
+    if (currentLanded && document.getElementById("f_length") && preservedLength) {
+      document.getElementById("f_length").value = preservedLength;
+    }
     document.getElementById("envFetchBtn").addEventListener("click", fetchEnvironmentData);
     document.querySelectorAll("#landedPicker .type-opt").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -989,6 +1085,11 @@
         renderCatchFields();
       });
     });
+    var speedInput = document.getElementById("f_wind_speed");
+    if (speedInput) speedInput.addEventListener("input", updateWindKnotsHint);
+    updateWindKnotsHint();
+    document.getElementById("f_method").addEventListener("change", function () { updateBaitField(); });
+    updateBaitField(preservedBait, preservedBaitOther);
   }
 
   function nameFieldHtml(isCatch, selectedSpecies) {
@@ -1065,12 +1166,11 @@
   }
 
   function setType(type) {
-    var previousName = document.getElementById("f_name") ? document.getElementById("f_name").value : null;
     currentType = type;
     if (ALWAYS_POLYGON_TYPES[type]) currentGeometry = "polygon";
     else if (type !== "spot") currentGeometry = "point";
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
-    document.getElementById("nameFieldContainer").innerHTML = nameFieldHtml(type === "catch", type === "catch" ? previousName : null);
+    document.getElementById("nameFieldContainer").innerHTML = type === "catch" ? "" : nameFieldHtml(false, null);
     var extraHtml = "";
     if (type === "spot") extraHtml = spotClassPickerHtml() + geomPickerHtml() + monthPickerHtml() + substratePickerHtml();
     else if (type === "schutzzone") extraHtml = zoneClassPickerHtml();
@@ -1135,6 +1235,10 @@
       var el = document.getElementById(CATCH_FIELD_IDS[k]);
       if (el && entry[k] != null) el.value = (k === "method" && METHOD_LEGACY[entry[k]]) ? METHOD_LEGACY[entry[k]] : entry[k];
     });
+    var lengthEl = document.getElementById("f_length");
+    if (lengthEl) lengthEl.value = lengthEntryToInputValue(entry);
+    updateBaitField(entry.bait, null);
+    updateWindKnotsHint();
   }
 
   function openSheet(entry, preset) {
@@ -1554,22 +1658,19 @@
     });
   }
 
-  function degToCompass(deg) {
-    var dirs = ["Nord", "Nordost", "Ost", "Südost", "Süd", "Südwest", "West", "Nordwest"];
-    return dirs[Math.round(deg / 45) % 8];
+  function degToCompass8(deg) {
+    return WIND_DIRECTIONS[Math.round(deg / 45) % 8];
   }
 
   var WEATHER_CODE_LABEL = {
-    0: "Klarer Himmel", 1: "Überwiegend klar", 2: "Teilweise bewölkt", 3: "Bedeckt",
-    45: "Nebel", 48: "Reifnebel",
-    51: "Leichter Nieselregen", 53: "Nieselregen", 55: "Starker Nieselregen",
-    56: "Leichter gefrierender Nieselregen", 57: "Gefrierender Nieselregen",
-    61: "Leichter Regen", 63: "Regen", 65: "Starker Regen",
-    66: "Leichter gefrierender Regen", 67: "Gefrierender Regen",
-    71: "Leichter Schneefall", 73: "Schneefall", 75: "Starker Schneefall", 77: "Schneegriesel",
-    80: "Leichte Regenschauer", 81: "Regenschauer", 82: "Heftige Regenschauer",
-    85: "Leichte Schneeschauer", 86: "Schneeschauer",
-    95: "Gewitter", 96: "Gewitter mit leichtem Hagel", 99: "Gewitter mit starkem Hagel"
+    0: "Sonnig", 1: "Leicht bewölkt", 2: "Bewölkt", 3: "Bedeckt",
+    45: "Nebel", 48: "Nebel",
+    51: "Regen", 53: "Regen", 55: "Regen", 56: "Regen", 57: "Regen",
+    61: "Regen", 63: "Regen", 65: "Regen", 66: "Regen", 67: "Regen",
+    71: "Schnee", 73: "Schnee", 75: "Schnee", 77: "Schnee",
+    80: "Schauer", 81: "Schauer", 82: "Schauer",
+    85: "Schnee", 86: "Schnee",
+    95: "Gewitter", 96: "Gewitter", 99: "Gewitter"
   };
 
   function fetchEnvironmentData() {
@@ -1586,7 +1687,7 @@
     var hourKey = date + "T" + time.slice(0, 2) + ":00";
     var tz = "Europe%2FBerlin";
     var windUrl = "https://archive-api.open-meteo.com/v1/archive?latitude=" + lat + "&longitude=" + lng +
-      "&start_date=" + date + "&end_date=" + date + "&hourly=wind_speed_10m,wind_direction_10m,weathercode,pressure_msl&timezone=" + tz;
+      "&start_date=" + date + "&end_date=" + date + "&hourly=wind_speed_10m,wind_direction_10m,weathercode,pressure_msl,temperature_2m&timezone=" + tz;
     var seaUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + lat + "&longitude=" + lng +
       "&start_date=" + date + "&end_date=" + date + "&hourly=sea_surface_temperature&timezone=" + tz;
 
@@ -1601,9 +1702,14 @@
         if (idx === -1) idx = 12;
         var speed = wind.hourly.wind_speed_10m[idx];
         var dir = wind.hourly.wind_direction_10m[idx];
-        if (speed != null && dir != null) {
-          document.getElementById("f_wind").value = Math.round(speed) + " km/h aus " + degToCompass(dir);
-          filled.push("Wind");
+        if (speed != null) {
+          document.getElementById("f_wind_speed").value = Math.round(speed);
+          updateWindKnotsHint();
+          filled.push("Windgeschw.");
+        }
+        if (dir != null) {
+          document.getElementById("f_wind_dir").value = degToCompass8(dir);
+          filled.push("Windrichtung");
         }
         var code = wind.hourly.weathercode ? wind.hourly.weathercode[idx] : null;
         if (code != null && WEATHER_CODE_LABEL[code]) {
@@ -1614,6 +1720,11 @@
         if (pressure != null) {
           document.getElementById("f_pressure").value = Math.round(pressure * 10) / 10;
           filled.push("Luftdruck");
+        }
+        var airTemp = wind.hourly.temperature_2m ? wind.hourly.temperature_2m[idx] : null;
+        if (airTemp != null) {
+          document.getElementById("f_air_temp").value = Math.round(airTemp);
+          filled.push("Lufttemperatur");
         }
       }
       if (sea && sea.hourly && sea.hourly.time) {
@@ -1911,13 +2022,23 @@
       data.date = g("f_date") || null;
       data.time = g("f_time") || null;
       data.method = g("f_method") || null;
-      data.lengthCm = currentLanded && g("f_length") ? parseInt(g("f_length"), 10) : null;
+      var lenParsed = parseLengthInput(currentLanded ? g("f_length") : "");
+      data.lengthCm = lenParsed.lengthCm;
+      data.lengthApprox = lenParsed.lengthApprox;
+      data.lengthMinCm = lenParsed.lengthMinCm;
+      data.lengthMaxCm = lenParsed.lengthMaxCm;
       data.countFish = currentLanded ? (g("f_count") ? parseInt(g("f_count"), 10) : 1) : null;
+      data.airTempC = g("f_air_temp") ? parseInt(g("f_air_temp"), 10) : null;
       data.waterTempC = g("f_temp") ? parseInt(g("f_temp"), 10) : null;
-      data.wind = g("f_wind") || null;
+      data.windDirection = g("f_wind_dir") || null;
+      data.windSpeedKmh = g("f_wind_speed") ? parseFloat(g("f_wind_speed")) : null;
       data.pressure = g("f_pressure") ? parseFloat(g("f_pressure")) : null;
       data.salinityPct = g("f_sal") || null;
       data.weather = g("f_weather") || null;
+      var baitWrap = document.getElementById("baitFieldWrap");
+      var baitSelectVal = baitWrap && !baitWrap.hidden ? g("f_bait") : "";
+      var baitOtherVal = g("f_bait_other");
+      data.bait = (baitSelectVal === "Sonstiges" && baitOtherVal) ? baitOtherVal : (baitSelectVal || null);
     }
     var saveBtn = document.getElementById("saveBtn");
     saveBtn.disabled = true;
