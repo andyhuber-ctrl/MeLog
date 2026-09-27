@@ -24,6 +24,8 @@
     --hotspot: #D9481F; --hotspot-wash: #FBE4DA;
     --potspot: #3F8C4C; --potspot-wash: #DFF0DE;
     --schutzzone-ganzjaehrig: #8B3A96; --schutzzone-zeitlich: #B87BC2; --schutzzone-wash: #F1E2F3;
+    --einlauf: #2B6CB0; --einlauf-wash: #DCE9F5;
+    --hinweis: #C99A1E; --hinweis-wash: #F5ECD3;
     --shadow: 0 8px 24px -12px rgba(8, 40, 44, 0.28);
     --radius: 14px;
   }
@@ -39,6 +41,8 @@
       --hotspot: #F1875A; --hotspot-wash: #3D2015;
       --potspot: #7ED18F; --potspot-wash: #173A1E;
       --schutzzone-ganzjaehrig: #D08AD9; --schutzzone-zeitlich: #E6C7EC; --schutzzone-wash: #2E1E33;
+      --einlauf: #6FA8DC; --einlauf-wash: #16283A;
+      --hinweis: #E8C463; --hinweis-wash: #332B14;
       --shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.55);
     }
   }
@@ -107,11 +111,25 @@
     background: var(--surface); color: var(--ink);
   }
   .map-filter-btn:hover { background: var(--surface-2); }
-  .map-filter-panel {
-    position: absolute; top: 100%; right: 0; margin-top: 6px;
-    z-index: 1000; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
-    border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px;
-    width: 230px; max-height: 70vh; overflow-y: auto;
+  .filter-backdrop {
+    position: fixed; inset: 0; z-index: 1000; background: rgba(6,20,22,0.5);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    display: flex; justify-content: flex-end;
+  }
+  .filter-backdrop.open { opacity: 1; pointer-events: auto; }
+  .filter-side-panel {
+    position: relative; width: min(300px, 86vw); height: 100%;
+    background: var(--surface); box-shadow: var(--shadow);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+    transform: translateX(100%); transition: transform 0.25s ease;
+  }
+  .filter-backdrop.open .filter-side-panel { transform: translateX(0); }
+  .filter-side-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .filter-side-header h2 { margin: 0; font-size: 1.1rem; }
+  .filter-close-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--ink); cursor: pointer; font-size: 0.95rem;
+    display: flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto;
   }
   .filter-type-row { display: flex; align-items: center; gap: 6px; }
   .filter-type-row .map-filter-chip { flex: 1; }
@@ -141,6 +159,8 @@
   .map-filter-chip.active[data-type="parking"] { background: var(--parking); }
   .map-filter-chip.active[data-type="access"] { background: var(--access); }
   .map-filter-chip.active[data-type="schutzzone"] { background: var(--schutzzone-ganzjaehrig); }
+  .map-filter-chip.active[data-type="einlauf"] { background: var(--einlauf); }
+  .map-filter-chip.active[data-type="hinweis"] { background: var(--hinweis); color: #241800; }
 
   .vertex-handle { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,0.4); cursor: grab; }
   .vertex-handle-mid { width: 14px; height: 14px; border-width: 2px; opacity: 0.8; cursor: copy; }
@@ -162,6 +182,8 @@
   .badge.access { background: var(--access-wash); color: var(--access); }
   .badge.schutzzone { background: var(--schutzzone-wash); color: var(--schutzzone-ganzjaehrig); }
   .badge.schutzzone.zeitlich { color: var(--schutzzone-zeitlich); }
+  .badge.einlauf { background: var(--einlauf-wash); color: var(--einlauf); }
+  .badge.hinweis { background: var(--hinweis-wash); color: var(--hinweis); }
   .card-body { flex: 1; min-width: 0; }
   .card-title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .card-title { font-weight: 700; }
@@ -198,6 +220,8 @@
   .pin-icon.spot.potspot .dot { background: var(--potspot); }
   .pin-icon.access .dot { background: var(--access); }
   .pin-icon.schutzzone .dot { background: var(--schutzzone-ganzjaehrig); }
+  .pin-icon.einlauf .dot { background: var(--einlauf); }
+  .pin-icon.hinweis .dot { background: var(--hinweis); }
   .pin-icon.fish { width: 38px; height: 22px; display: flex; align-items: center; justify-content: center; }
   .pin-icon.fish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
   .pin-icon.fish.unlanded img { opacity: 0.5; filter: grayscale(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
@@ -225,6 +249,8 @@
   .type-opt[aria-pressed="true"].parking { background: var(--parking); border-color: var(--parking); color: #fff; }
   .type-opt[aria-pressed="true"].access { background: var(--access); border-color: var(--access); color: #fff; }
   .type-opt[aria-pressed="true"].schutzzone { background: var(--schutzzone-ganzjaehrig); border-color: var(--schutzzone-ganzjaehrig); color: #fff; }
+  .type-opt[aria-pressed="true"].einlauf { background: var(--einlauf); border-color: var(--einlauf); color: #fff; }
+  .type-opt[aria-pressed="true"].hinweis { background: var(--hinweis); border-color: var(--hinweis); color: #241800; }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
   .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; color: var(--ink); font-size: 0.95rem; font-family: inherit; }
@@ -332,14 +358,31 @@
 (function () {
   "use strict";
 
-  var TYPE_LABEL = { spot: "Spot", catch: "Fang", parking: "Parken", access: "Zugang", schutzzone: "Schutzzone" };
-  var TYPE_ICON = { spot: "⊙", catch: "🐟", parking: "P", access: "→", schutzzone: "⛔" };
+  var TYPE_LABEL = { spot: "Spot", catch: "Fang", parking: "Parken", access: "Zugang", schutzzone: "Schutzzone", einlauf: "Einlauf", hinweis: "Hinweis" };
+  var TYPE_ICON = { spot: "⊙", catch: "🐟", parking: "P", access: "→", schutzzone: "⛔", einlauf: "🌊", hinweis: "ℹ️" };
   var SPOT_CLASSES = ["hotspot", "spot", "potspot"];
   var SPOT_CLASS_LABEL = { hotspot: "Hotspot", spot: "Spot", potspot: "PotSpot" };
   var ZONE_CLASSES = ["ganzjaehrig", "zeitlich"];
   var ZONE_CLASS_LABEL = { ganzjaehrig: "Ganzjährig", zeitlich: "Zeitlich begrenzt" };
   var ALWAYS_POLYGON_TYPES = { schutzzone: true };
   var MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  var SEASONS = ["Frühling", "Sommer", "Herbst", "Winter"];
+  var SEASON_MONTHS = { "Frühling": ["Mär", "Apr", "Mai"], "Sommer": ["Jun", "Jul", "Aug"], "Herbst": ["Sep", "Okt", "Nov"], "Winter": ["Dez", "Jan", "Feb"] };
+  function seasonsOfMonths(monthList) {
+    var result = [];
+    (monthList || []).forEach(function (m) {
+      SEASONS.forEach(function (s) { if (SEASON_MONTHS[s].indexOf(m) !== -1 && result.indexOf(s) === -1) result.push(s); });
+    });
+    return result;
+  }
+  function seasonOfDate(iso) {
+    if (!iso) return null;
+    var monthNum = parseInt(iso.split("-")[1], 10);
+    if (!monthNum) return null;
+    var m = MONTHS[monthNum - 1];
+    for (var i = 0; i < SEASONS.length; i++) { if (SEASON_MONTHS[SEASONS[i]].indexOf(m) !== -1) return SEASONS[i]; }
+    return null;
+  }
   var SUBSTRATE_TYPES = ["Steinig", "Sand", "Schlamm", "Kies", "Tang", "Seegras", "Muschelbank", "Sonstiges"];
   var SPECIES = ["Meerforelle", "Lachs", "Dorsch", "Hornhecht", "Hecht", "Barsch", "Scholle", "Flunder", "Aal", "Makrele", "Sonstige"];
   var FLY_PATTERNS = ["Pattegrisen", "Polar Magnus", "Kobberbassen", "Pfannenfüller", "Woolly Bugger", "Tangloppen", "Vaskebjørnen", "Nightskater", "Sonstiges"];
@@ -506,6 +549,7 @@
     if (e.type === "catch" && e.landed === false) tags.push("Nur Biss – nicht gelandet");
     if (e.type === "spot" && spotClassOf(e) !== "spot") tags.push(SPOT_CLASS_LABEL[spotClassOf(e)]);
     if (e.type === "schutzzone") tags.push(ZONE_CLASS_LABEL[zoneClassOf(e)]);
+    if (e.type === "einlauf") tags.push(e.laichfluss ? "Laichfluss" : "Kein Laichfluss");
     if (hasPolygon(e)) tags.push("Fläche");
     if (e.type === "spot" && e.goodMonths && e.goodMonths.length) {
       tags.push("Fängig: " + MONTHS.filter(function (m) { return e.goodMonths.indexOf(m) !== -1; }).join(", "));
@@ -635,20 +679,33 @@
   var markerLayer = L.layerGroup().addTo(map);
   var ghostMarker = null;
   var moveMarker = null;
-  var mapTypeFilter = { spot: true, catch: true, parking: true, access: true, schutzzone: true };
-  var spotFilter = { classes: [], months: [], substrate: [] };
-  var catchFilter = { species: [] };
-  var filterSectionExpanded = { spot: false, catch: false };
+  var mapTypeFilter = { spot: true, catch: true, parking: true, access: true, schutzzone: true, einlauf: true, hinweis: true };
+  var spotFilter = { classes: [], months: [], substrate: [], seasons: [] };
+  var catchFilter = { species: [], methods: [], years: [], seasons: [], results: [] };
+  var parkingFilter = { classes: [] };
+  var einlaufFilter = { laichfluss: [] };
+  var filterSectionExpanded = { spot: false, catch: false, parking: false, einlauf: false };
 
   function entryPassesFilter(e) {
     if (!mapTypeFilter[e.type]) return false;
     if (e.type === "spot") {
       if (spotFilter.classes.length && spotFilter.classes.indexOf(spotClassOf(e)) === -1) return false;
       if (spotFilter.months.length && !(e.goodMonths || []).some(function (m) { return spotFilter.months.indexOf(m) !== -1; })) return false;
+      if (spotFilter.seasons.length && !seasonsOfMonths(e.goodMonths).some(function (s) { return spotFilter.seasons.indexOf(s) !== -1; })) return false;
       if (spotFilter.substrate.length && !(e.substrate || []).some(function (s) { return spotFilter.substrate.indexOf(s) !== -1; })) return false;
     }
     if (e.type === "catch") {
       if (catchFilter.species.length && catchFilter.species.indexOf(e.name) === -1) return false;
+      if (catchFilter.methods.length && catchFilter.methods.indexOf(e.method) === -1) return false;
+      if (catchFilter.years.length && catchFilter.years.indexOf((e.date || "").slice(0, 4)) === -1) return false;
+      if (catchFilter.seasons.length && catchFilter.seasons.indexOf(seasonOfDate(e.date)) === -1) return false;
+      if (catchFilter.results.length && catchFilter.results.indexOf(e.landed === false ? "biss" : "gefangen") === -1) return false;
+    }
+    if (e.type === "parking") {
+      if (parkingFilter.classes.length && parkingFilter.classes.indexOf(parkingClassOf(e)) === -1) return false;
+    }
+    if (e.type === "einlauf") {
+      if (einlaufFilter.laichfluss.length && einlaufFilter.laichfluss.indexOf(e.laichfluss ? "ja" : "nein") === -1) return false;
     }
     return true;
   }
@@ -734,38 +791,92 @@
     return '<button type="button" class="filter-chip" data-kind="' + kind + '" data-value="' + value + '" aria-pressed="' + (pressedList.indexOf(value) !== -1) + '">' + label + "</button>";
   }
 
+  function filterListFor(kind) {
+    var map = {
+      spotClass: spotFilter.classes,
+      spotMonth: spotFilter.months,
+      spotSeason: spotFilter.seasons,
+      spotSubstrate: spotFilter.substrate,
+      catchSpecies: catchFilter.species,
+      catchMethod: catchFilter.methods,
+      catchYear: catchFilter.years,
+      catchSeason: catchFilter.seasons,
+      catchResult: catchFilter.results,
+      parkingClass: parkingFilter.classes,
+      einlaufLaichfluss: einlaufFilter.laichfluss
+    };
+    return map[kind];
+  }
+
+  function catchYearsAvailable() {
+    var years = {};
+    state.entries.forEach(function (e) { if (e.type === "catch" && e.date) years[e.date.slice(0, 4)] = true; });
+    return Object.keys(years).sort().reverse();
+  }
+
+  function filterTypeRowHtml(type, label, expandable) {
+    return '<div class="filter-type-row">' +
+      '<button type="button" class="map-filter-chip' + (mapTypeFilter[type] ? " active" : "") + '" data-type="' + type + '">' + label + "</button>" +
+      (expandable ? '<button type="button" class="filter-expand-btn" data-expand="' + type + '" aria-expanded="' + filterSectionExpanded[type] + '" aria-label="' + label + '-Filter">&#9662;</button>' : "") +
+    "</div>";
+  }
+
   function renderFilterPanel() {
     var html = "";
-    html += '<div class="filter-type-row">' +
-      '<button type="button" class="map-filter-chip' + (mapTypeFilter.spot ? " active" : "") + '" data-type="spot">Spots</button>' +
-      '<button type="button" class="filter-expand-btn" data-expand="spot" aria-expanded="' + filterSectionExpanded.spot + '" aria-label="Spot-Filter">&#9662;</button>' +
-    "</div>";
-    html += '<div class="filter-subsection" id="filterSub_spot"' + (filterSectionExpanded.spot ? "" : " hidden") + '>' +
-      '<div class="filter-subgroup-label">Kategorie</div><div class="filter-subgroup">' +
-        SPOT_CLASSES.map(function (c) { return filterChipHtml("class", c, SPOT_CLASS_LABEL[c], spotFilter.classes); }).join("") +
-      "</div>" +
-      '<div class="filter-subgroup-label">Monate</div><div class="filter-subgroup">' +
-        MONTHS.map(function (m) { return filterChipHtml("month", m, m, spotFilter.months); }).join("") +
-      "</div>" +
-      '<div class="filter-subgroup-label">Beschaffenheit</div><div class="filter-subgroup">' +
-        SUBSTRATE_TYPES.map(function (s) { return filterChipHtml("substrate", s, s, spotFilter.substrate); }).join("") +
-      "</div>" +
-    "</div>";
 
-    html += '<div class="filter-type-row">' +
-      '<button type="button" class="map-filter-chip' + (mapTypeFilter.catch ? " active" : "") + '" data-type="catch">Fänge</button>' +
-      '<button type="button" class="filter-expand-btn" data-expand="catch" aria-expanded="' + filterSectionExpanded.catch + '" aria-label="Fang-Filter">&#9662;</button>' +
-    "</div>";
+    html += filterTypeRowHtml("catch", "Fänge", true);
     html += '<div class="filter-subsection" id="filterSub_catch"' + (filterSectionExpanded.catch ? "" : " hidden") + '>' +
       '<div class="filter-subgroup-label">Fischart</div><div class="filter-subgroup">' +
-        SPECIES.map(function (s) { return filterChipHtml("species", s, s, catchFilter.species); }).join("") +
+        SPECIES.map(function (s) { return filterChipHtml("catchSpecies", s, s, catchFilter.species); }).join("") +
+      "</div>" +
+      '<div class="filter-subgroup-label">Methode</div><div class="filter-subgroup">' +
+        ["Fliegenfischen", "Spinnfischen", "Sonstiges"].map(function (m) { return filterChipHtml("catchMethod", m, m, catchFilter.methods); }).join("") +
+      "</div>" +
+      '<div class="filter-subgroup-label">Jahr</div><div class="filter-subgroup">' +
+        (catchYearsAvailable().length ? catchYearsAvailable().map(function (y) { return filterChipHtml("catchYear", y, y, catchFilter.years); }).join("") : '<span class="form-hint">Noch keine Fänge mit Datum.</span>') +
+      "</div>" +
+      '<div class="filter-subgroup-label">Jahreszeit</div><div class="filter-subgroup">' +
+        SEASONS.map(function (s) { return filterChipHtml("catchSeason", s, s, catchFilter.seasons); }).join("") +
+      "</div>" +
+      '<div class="filter-subgroup-label">Ergebnis</div><div class="filter-subgroup">' +
+        filterChipHtml("catchResult", "gefangen", "Gefangen", catchFilter.results) +
+        filterChipHtml("catchResult", "biss", "Nur Biss", catchFilter.results) +
       "</div>" +
     "</div>";
 
-    ["parking", "access", "schutzzone"].forEach(function (t) {
-      html += '<div class="filter-type-row">' +
-        '<button type="button" class="map-filter-chip' + (mapTypeFilter[t] ? " active" : "") + '" data-type="' + t + '">' + TYPE_LABEL[t] + "</button>" +
-      "</div>";
+    html += filterTypeRowHtml("spot", "Spots", true);
+    html += '<div class="filter-subsection" id="filterSub_spot"' + (filterSectionExpanded.spot ? "" : " hidden") + '>' +
+      '<div class="filter-subgroup-label">Kategorie</div><div class="filter-subgroup">' +
+        SPOT_CLASSES.map(function (c) { return filterChipHtml("spotClass", c, SPOT_CLASS_LABEL[c], spotFilter.classes); }).join("") +
+      "</div>" +
+      '<div class="filter-subgroup-label">Jahreszeit</div><div class="filter-subgroup">' +
+        SEASONS.map(function (s) { return filterChipHtml("spotSeason", s, s, spotFilter.seasons); }).join("") +
+      "</div>" +
+      '<div class="filter-subgroup-label">Monate</div><div class="filter-subgroup">' +
+        MONTHS.map(function (m) { return filterChipHtml("spotMonth", m, m, spotFilter.months); }).join("") +
+      "</div>" +
+      '<div class="filter-subgroup-label">Beschaffenheit</div><div class="filter-subgroup">' +
+        SUBSTRATE_TYPES.map(function (s) { return filterChipHtml("spotSubstrate", s, s, spotFilter.substrate); }).join("") +
+      "</div>" +
+    "</div>";
+
+    html += filterTypeRowHtml("parking", "Parken", true);
+    html += '<div class="filter-subsection" id="filterSub_parking"' + (filterSectionExpanded.parking ? "" : " hidden") + '>' +
+      '<div class="filter-subgroup-label">Art</div><div class="filter-subgroup">' +
+        PARKING_CLASSES.map(function (c) { return filterChipHtml("parkingClass", c, PARKING_CLASS_LABEL[c], parkingFilter.classes); }).join("") +
+      "</div>" +
+    "</div>";
+
+    html += filterTypeRowHtml("einlauf", "Einlauf", true);
+    html += '<div class="filter-subsection" id="filterSub_einlauf"' + (filterSectionExpanded.einlauf ? "" : " hidden") + '>' +
+      '<div class="filter-subgroup-label">Laichfluss</div><div class="filter-subgroup">' +
+        filterChipHtml("einlaufLaichfluss", "ja", "Laichfluss", einlaufFilter.laichfluss) +
+        filterChipHtml("einlaufLaichfluss", "nein", "Kein Laichfluss", einlaufFilter.laichfluss) +
+      "</div>" +
+    "</div>";
+
+    ["access", "schutzzone", "hinweis"].forEach(function (t) {
+      html += filterTypeRowHtml(t, TYPE_LABEL[t], false);
     });
 
     filterPanelEl.innerHTML = html;
@@ -792,7 +903,7 @@
       chip.addEventListener("click", function () {
         var kind = chip.getAttribute("data-kind");
         var val = chip.getAttribute("data-value");
-        var list = kind === "class" ? spotFilter.classes : kind === "month" ? spotFilter.months : kind === "substrate" ? spotFilter.substrate : catchFilter.species;
+        var list = filterListFor(kind);
         var idx = list.indexOf(val);
         if (idx === -1) list.push(val); else list.splice(idx, 1);
         chip.setAttribute("aria-pressed", idx === -1 ? "true" : "false");
@@ -801,25 +912,44 @@
     });
   }
 
+  var filterBackdropEl = null;
+
+  function closeFilterPanel() {
+    if (filterBackdropEl) { filterBackdropEl.remove(); filterBackdropEl = null; filterPanelEl = null; }
+  }
+
+  function openFilterSidePanel() {
+    if (filterBackdropEl) { closeFilterPanel(); return; }
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="filter-backdrop" id="filterBackdrop">' +
+        '<div class="filter-side-panel">' +
+          '<div class="filter-side-header"><h2>Filter</h2><button type="button" class="filter-close-btn" id="filterCloseBtn" aria-label="Schließen">✕</button></div>' +
+          '<div id="filterPanelContent"></div>' +
+        "</div>" +
+      "</div>");
+    filterBackdropEl = document.getElementById("filterBackdrop");
+    filterPanelEl = document.getElementById("filterPanelContent");
+    requestAnimationFrame(function () { filterBackdropEl.classList.add("open"); });
+    filterBackdropEl.addEventListener("click", function (ev) { if (ev.target === filterBackdropEl) closeFilterPanel(); });
+    document.getElementById("filterCloseBtn").addEventListener("click", closeFilterPanel);
+    renderFilterPanel();
+  }
+
   var FilterControl = L.Control.extend({
     options: { position: "topright" },
     onAdd: function () {
       var wrap = L.DomUtil.create("div", "leaflet-bar leaflet-control map-filter-control-wrap");
       var btn = L.DomUtil.create("a", "map-filter-btn", wrap);
       btn.href = "#";
-      btn.innerHTML = "&#128269;";
+      btn.innerHTML = "🎚️";
       btn.setAttribute("aria-label", "Filter");
       btn.title = "Filter";
-      filterPanelEl = L.DomUtil.create("div", "map-filter-panel", wrap);
-      filterPanelEl.hidden = true;
       L.DomEvent.disableClickPropagation(wrap);
       L.DomEvent.disableScrollPropagation(wrap);
-      L.DomEvent.on(wrap, "click", L.DomEvent.stopPropagation);
       L.DomEvent.on(btn, "click", function (ev) {
         L.DomEvent.preventDefault(ev);
-        filterPanelEl.hidden = !filterPanelEl.hidden;
+        openFilterSidePanel();
       });
-      renderFilterPanel();
       return wrap;
     }
   });
@@ -1038,9 +1168,10 @@
   searchInput.addEventListener("input", function (ev) { state.search = ev.target.value; renderList(); });
 
   // ---- add/edit sheet ----
-  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [] };
+  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [], einlauf: ["laichfluss"], hinweis: [] };
   var METHOD_LEGACY = { "Fliege": "Fliegenfischen", "Spinnrute": "Spinnfischen" };
   var DYN_FIELD_HTML = {
+    laichfluss: '<div class="field"><div class="checkbox-field"><input type="checkbox" id="f_laichfluss" /><label for="f_laichfluss">Laichfluss (Fischaufstieg/Laichgewässer)</label></div></div>',
     dateTime: '<div class="field-row">' +
       '<div class="field"><label for="f_date">Datum</label><input id="f_date" type="date" /></div>' +
       '<div class="field"><label for="f_time">Uhrzeit</label><input id="f_time" type="time" /></div>' +
@@ -1098,6 +1229,8 @@
         '<button type="button" class="type-opt parking" data-type="parking">Parken</button>' +
         '<button type="button" class="type-opt access" data-type="access">Zugang</button>' +
         '<button type="button" class="type-opt schutzzone" data-type="schutzzone">Schutzzone</button>' +
+        '<button type="button" class="type-opt einlauf" data-type="einlauf">Einlauf</button>' +
+        '<button type="button" class="type-opt hinweis" data-type="hinweis">Hinweis</button>' +
       "</div>" +
       '<div id="nameFieldContainer"></div>' +
       '<div id="geomPickerContainer"></div>' +
@@ -1462,6 +1595,8 @@
       document.getElementById("f_lng").value = entry.lng;
       document.getElementById("f_notes").value = entry.notes || "";
       fillDynamic(entry);
+      var laichflussEl = document.getElementById("f_laichfluss");
+      if (laichflussEl && entry.laichfluss) laichflussEl.checked = true;
     } else if (preset && preset.lat != null && preset.lng != null) {
       document.getElementById("f_lat").value = preset.lat.toFixed(6);
       document.getElementById("f_lng").value = preset.lng.toFixed(6);
@@ -2231,6 +2366,7 @@
       goodMonths: currentType === "spot" ? currentGoodMonths.slice() : null,
       substrate: currentType === "spot" ? currentSubstrate.slice() : null,
       parkingClass: currentType === "parking" ? currentParkingClass : null,
+      laichfluss: currentType === "einlauf" ? !!(document.getElementById("f_laichfluss") && document.getElementById("f_laichfluss").checked) : null,
       photo: currentPhoto || null,
       notes: document.getElementById("f_notes").value.trim() || null,
       visibility: currentVisibility,
