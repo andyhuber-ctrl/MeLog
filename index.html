@@ -479,24 +479,21 @@
   function refreshOwnEntriesVisibility() {
     var uid = auth.currentUser && auth.currentUser.uid;
     if (!uid) return Promise.resolve();
-    return db.collection("entries").where("ownerId", "==", uid).get().then(function (snap) {
-      var toUpdate = [];
-      snap.forEach(function (doc) {
-        var e = doc.data();
-        if (e.visibility === "privat") return; // visibleTo ist immer nur [uid], nichts zu tun
-        toUpdate.push({ id: doc.id, visibleTo: computeVisibleTo(uid, e.visibility || "privat") });
-      });
-      var batches = chunk(toUpdate, 400);
-      var p = Promise.resolve();
-      batches.forEach(function (group) {
-        p = p.then(function () {
-          var batch = db.batch();
-          group.forEach(function (u) { batch.update(db.collection("entries").doc(u.id), { visibleTo: u.visibleTo }); });
-          return batch.commit();
-        });
-      });
-      return p;
+    var toUpdate = [];
+    state.entries.forEach(function (e) {
+      if (e.ownerId !== uid || e.visibility === "privat") return; // visibleTo ist immer nur [uid], nichts zu tun
+      toUpdate.push({ id: e.id, visibleTo: computeVisibleTo(uid, e.visibility || "privat") });
     });
+    var batches = chunk(toUpdate, 400);
+    var p = Promise.resolve();
+    batches.forEach(function (group) {
+      p = p.then(function () {
+        var batch = db.batch();
+        group.forEach(function (u) { batch.update(db.collection("entries").doc(u.id), { visibleTo: u.visibleTo }); });
+        return batch.commit();
+      });
+    });
+    return p;
   }
 
   var listRoot = document.getElementById("listRoot");
@@ -2705,41 +2702,35 @@
 
   function migratePhotosToStorage() {
     var btn = document.getElementById("migratePhotosBtn");
-    var original = btn.textContent;
     btn.disabled = true;
     btn.textContent = "Prüfe …";
     var uid = auth.currentUser.uid;
-    db.collection("entries").where("ownerId", "==", uid).get().then(function (snap) {
-      var toMigrate = [];
-      snap.forEach(function (doc) {
-        var photo = doc.data().photo;
-        if (photo && photo.indexOf("data:") === 0) toMigrate.push({ id: doc.id, photo: photo });
-      });
-      if (!toMigrate.length) {
-        showToast("Keine Fotos zum Umstellen gefunden");
-        btn.textContent = "Bereits umgestellt";
-        return;
-      }
-      var done = 0;
-      btn.textContent = "0 / " + toMigrate.length + " …";
-      var p = Promise.resolve();
-      toMigrate.forEach(function (item) {
-        p = p.then(function () {
-          var path = "photos/" + uid + "/" + item.id;
-          return storage.ref(path).putString(item.photo, "data_url", { contentType: "image/jpeg" })
-            .then(function () { return db.collection("entries").doc(item.id).update({ photo: path }); })
-            .then(function () { done++; btn.textContent = done + " / " + toMigrate.length + " …"; })
-            .catch(function (err) { console.error("Foto-Migration fehlgeschlagen für", item.id, err); });
-        });
-      });
-      return p.then(function () {
-        showToast(done + " von " + toMigrate.length + " Fotos umgestellt");
-        btn.textContent = "Umgestellt (" + done + ")";
-      });
-    }).catch(function (err) {
+    var toMigrate = [];
+    state.entries.forEach(function (e) {
+      if (e.ownerId === uid && e.photo && e.photo.indexOf("data:") === 0) toMigrate.push({ id: e.id, photo: e.photo });
+    });
+    if (!toMigrate.length) {
+      showToast("Keine Fotos zum Umstellen gefunden");
       btn.disabled = false;
-      btn.textContent = original;
-      showToast("Umstellung fehlgeschlagen: " + (err && err.message ? err.message : "unbekannt"));
+      btn.textContent = "Bereits umgestellt";
+      return;
+    }
+    var done = 0;
+    btn.textContent = "0 / " + toMigrate.length + " …";
+    var p = Promise.resolve();
+    toMigrate.forEach(function (item) {
+      p = p.then(function () {
+        var path = "photos/" + uid + "/" + item.id;
+        return storage.ref(path).putString(item.photo, "data_url", { contentType: "image/jpeg" })
+          .then(function () { return db.collection("entries").doc(item.id).update({ photo: path }); })
+          .then(function () { done++; btn.textContent = done + " / " + toMigrate.length + " …"; })
+          .catch(function (err) { console.error("Foto-Migration fehlgeschlagen für", item.id, err); });
+      });
+    });
+    p.then(function () {
+      showToast(done + " von " + toMigrate.length + " Fotos umgestellt");
+      btn.disabled = false;
+      btn.textContent = "Umgestellt (" + done + ")";
     });
   }
 
