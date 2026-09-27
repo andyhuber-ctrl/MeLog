@@ -179,19 +179,16 @@
   .photo-preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; display: block; }
   .card-notes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
   .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .details-toggle { display: block; background: none; border: none; padding: 2px 0; margin-top: 4px; font-size: 0.78rem; font-weight: 700; color: var(--accent); cursor: pointer; text-align: left; }
-  .details-panel { margin-top: 2px; }
+  .details-btn { display: block; background: none; border: none; padding: 2px 0; margin-top: 4px; font-size: 0.78rem; font-weight: 700; color: var(--accent); cursor: pointer; text-align: left; }
   .tag { font-size: 0.72rem; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-soft); padding: 2px 8px; border-radius: 999px; }
   .card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .card-actions a, .card-actions button { font-size: 0.78rem; text-decoration: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
   .card-actions .danger { color: var(--danger); border-color: var(--danger); background: transparent; }
-  .card-actions-compact { justify-content: flex-end; gap: 12px; }
-  .card-actions-compact .icon-btn { width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; }
   .empty-state { text-align: center; padding: 40px 16px; color: var(--ink-faint); }
 
   .fab { position: fixed; right: 18px; bottom: 22px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
   .fab-secondary { position: fixed; right: 22px; bottom: 88px; z-index: 900; background: var(--surface); color: var(--ink); border: 1px solid var(--border); width: 46px; height: 46px; border-radius: 50%; font-size: 1.15rem; box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .fab-photo-label { position: fixed; right: 0; bottom: 126px; width: 90px; z-index: 899; pointer-events: none; }
+  .fab-photo-label { position: fixed; right: 0; bottom: 112px; width: 90px; z-index: 899; pointer-events: none; }
   body.popup-open .fab, body.popup-open .fab-secondary, body.popup-open .fab-photo-label { display: none; }
 
   .pin-icon { width: 30px; height: 30px; position: relative; }
@@ -236,6 +233,10 @@
   .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--accent); background: none; border: none; padding: 0; }
   .checkbox-field label { display: inline; font-size: 0.95rem; font-weight: 500; color: var(--ink); text-transform: none; letter-spacing: normal; margin: 0; cursor: pointer; }
   .field-row { display: flex; gap: 10px; }
+  .sheet-viewing .field input:disabled, .sheet-viewing .field select:disabled, .sheet-viewing .field textarea:disabled { background: transparent; border-color: transparent; padding-left: 0; color: var(--ink); opacity: 1; -webkit-text-fill-color: var(--ink); }
+  .sheet-viewing .type-opt:disabled { cursor: default; opacity: 0.4; }
+  .sheet-viewing .type-opt:disabled[aria-pressed="true"] { opacity: 1; }
+  .sheet-viewing .checkbox-field input:disabled { opacity: 1; }
   .field-row .field { flex: 1; min-width: 0; }
   .form-hint { font-size: 0.74rem; color: var(--ink-faint); margin: -6px 0 12px; }
   .sheet-actions { display: flex; gap: 10px; margin-top: 16px; }
@@ -541,20 +542,24 @@
     var tags = cardTags(e);
     if (isPopup) tags = tags.filter(function (t) { return t !== "Fläche"; });
     else tags = tags.filter(function (t) { return t !== visibilityTagText; });
-    var metaBits = [];
     var isCatch = e.type === "catch";
+    var metaBits = [];
     if (isCatch && e.date) metaBits.push(fmtDate(e.date));
-    if (!isCatch && !hasPolygon(e)) metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
-    if (e.createdBy) metaBits.push(e.createdBy);
+    if (isPopup && isCatch && e.method) metaBits.push(e.method);
+    if (!isPopup && !isCatch && !hasPolygon(e)) metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
+    if (!isPopup && e.createdBy) metaBits.push(e.createdBy);
     var badgeExtra = e.type === "spot" && spotClassOf(e) !== "spot" ? " " + spotClassOf(e)
       : e.type === "schutzzone" ? " " + zoneClassOf(e)
       : "";
-    var detailsContent =
-      (metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "") +
-      (isPopup && e.photo ? '<div class="card-photo-link" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo card-photo-popup" src="' + e.photo + '" alt="" /></div>' : "") +
-      (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
-      (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "");
-    var hasDetails = !!(metaBits.length || e.photo || e.notes || tags.length);
+    var metaHtml = metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "";
+    var popupExtrasHtml = isPopup
+      ? metaHtml + (isCatch && e.photo ? '<div class="card-photo-link" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo card-photo-popup" src="' + e.photo + '" alt="" /></div>' : "")
+      : "";
+    var detailsContent = !isPopup
+      ? metaHtml +
+        (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
+        (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "")
+      : "";
     var isOwner = !!(e.ownerId && auth.currentUser && e.ownerId === auth.currentUser.uid);
     var visibilityActionHtml = (!isPopup && visibilityTagText)
       ? (isOwner
@@ -571,17 +576,15 @@
           '<div class="card-body">' +
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
-            (isPopup
-              ? (hasDetails ? '<button type="button" class="details-toggle">Details ▾</button><div class="details-panel" hidden>' + detailsContent + "</div>" : "")
-              : detailsContent) +
-            '<div class="card-actions' + (isPopup ? " card-actions-compact" : "") + '">' +
-              visibilityActionHtml +
-              (showMapsLinks ? '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a><a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' : "") +
-              (isPopup ? "" : '<button type="button" class="locate-on-map">Auf Karte</button>') +
-              (isPopup
-                ? '<button type="button" class="edit-btn icon-btn" title="Bearbeiten" aria-label="Bearbeiten">✏️</button><button type="button" class="danger delete-btn icon-btn" title="Löschen" aria-label="Löschen">🗑️</button>'
-                : '<button type="button" class="edit-btn">Bearbeiten</button><button type="button" class="danger delete-btn">Löschen</button>') +
-            "</div>" +
+            (isPopup ? popupExtrasHtml : detailsContent) +
+            (isPopup ? '<button type="button" class="details-btn">Details</button>' : "") +
+            (isPopup ? "" :
+              '<div class="card-actions">' +
+                visibilityActionHtml +
+                (showMapsLinks ? '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a><a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' : "") +
+                '<button type="button" class="locate-on-map">Auf Karte</button>' +
+                '<button type="button" class="edit-btn">Bearbeiten</button><button type="button" class="danger delete-btn">Löschen</button>' +
+              "</div>") +
           "</div>" +
           sidePhotoHtml +
         "</div>" +
@@ -984,19 +987,7 @@
       if (confirm('"' + entry.name + '" wirklich löschen?')) deleteEntry(entry);
     }
     if (ev.target.closest(".card-photo-link")) openPhotoLightbox(entry.photo);
-    if (ev.target.closest(".details-toggle")) {
-      var toggleBtn = ev.target.closest(".details-toggle");
-      var panel = toggleBtn.nextElementSibling;
-      var wasHidden = panel.hidden;
-      panel.hidden = !wasHidden;
-      toggleBtn.textContent = wasHidden ? "Details ▴" : "Details ▾";
-      var boundPopup = markers[entry.id] && markers[entry.id].getPopup ? markers[entry.id].getPopup() : null;
-      if (boundPopup && boundPopup._updateLayout && boundPopup._updatePosition) {
-        boundPopup._updateLayout();
-        boundPopup._updatePosition();
-        if (boundPopup._adjustPan) boundPopup._adjustPan();
-      }
-    }
+    if (ev.target.closest(".details-btn")) openSheet(entry, null, true);
     if (ev.target.closest(".locate-on-map")) {
       document.querySelectorAll(".tab-btn").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-tab") === "map" ? "true" : "false"); });
       state.tab = "map";
@@ -1432,7 +1423,7 @@
     }
   }
 
-  function openSheet(entry, preset) {
+  function openSheet(entry, preset, viewOnly) {
     map.closePopup();
     document.body.insertAdjacentHTML("beforeend", sheetTemplate());
     sheetEl = document.getElementById("sheetBackdrop");
@@ -1497,6 +1488,32 @@
       currentPhoto = null;
       updatePhotoPreview();
     });
+    if (viewOnly) {
+      sheetEl.classList.add("sheet-viewing");
+      document.getElementById("sheetTitle").textContent = entry.name || "Details";
+      sheetEl.querySelectorAll("input, select, textarea").forEach(function (el) { el.disabled = true; });
+      sheetEl.querySelectorAll(".type-picker button").forEach(function (el) { el.disabled = true; });
+      ["locateBtn", "moveOnMapBtn", "drawPolygonBtn", "editVerticesBtn", "addPhotoBtn", "removePhotoBtn"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.hidden = true;
+      });
+      var actionsEl = sheetEl.querySelector(".sheet-actions");
+      actionsEl.innerHTML =
+        '<button type="button" class="btn-secondary" id="viewCloseBtn">Schließen</button>' +
+        '<button type="button" class="btn-secondary" id="viewEditBtn">✏️ Bearbeiten</button>' +
+        '<button type="button" class="danger btn-secondary" id="viewDeleteBtn">🗑️ Löschen</button>';
+      document.getElementById("viewCloseBtn").addEventListener("click", closeSheet);
+      document.getElementById("viewEditBtn").addEventListener("click", function () {
+        closeSheet();
+        openSheet(entry);
+      });
+      document.getElementById("viewDeleteBtn").addEventListener("click", function () {
+        if (confirm('"' + entry.name + '" wirklich löschen?')) {
+          closeSheet();
+          deleteEntry(entry);
+        }
+      });
+    }
   }
 
   function useLocation() {
