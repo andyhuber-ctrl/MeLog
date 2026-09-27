@@ -170,6 +170,9 @@
   .card-photo-link { display: block; margin-top: 8px; cursor: pointer; }
   .card-photo { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; display: block; }
   .card-photo.card-photo-popup { width: auto; height: auto; max-width: 150px; max-height: 130px; object-fit: contain; margin: 0 auto; }
+  .card-photo-link-side { flex: 0 0 auto; width: 128px; align-self: stretch; display: flex; align-items: flex-start; justify-content: center; cursor: pointer; margin-top: 0; }
+  .card-photo.card-photo-side { width: 128px; max-height: 220px; object-fit: contain; border-radius: 10px; }
+  .visibility-readonly { display: inline-flex; align-items: center; font-size: 0.78rem; color: var(--ink-soft); padding: 6px 10px; }
   .photo-lightbox { position: fixed; inset: 0; z-index: 3000; background: rgba(6, 14, 16, 0.9); display: flex; align-items: center; justify-content: center; padding: 28px; }
   .photo-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
   .photo-lightbox-close { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,0.15); color: #fff; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -534,8 +537,10 @@
       else if (e.lengthCm) statLine = e.lengthCm + (e.lengthApprox !== false ? "+" : "") + " cm";
       if (e.countFish && e.countFish > 1) statLine = e.countFish + "× " + statLine;
     }
+    var visibilityTagText = e.visibility ? (VISIBILITY_ICON[e.visibility] + " " + VISIBILITY_LABEL[e.visibility]) : null;
     var tags = cardTags(e);
     if (isPopup) tags = tags.filter(function (t) { return t !== "Fläche"; });
+    else tags = tags.filter(function (t) { return t !== visibilityTagText; });
     var metaBits = [];
     var isCatch = e.type === "catch";
     if (isCatch && e.date) metaBits.push(fmtDate(e.date));
@@ -546,10 +551,19 @@
       : "";
     var detailsContent =
       (metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "") +
-      (e.photo ? '<div class="card-photo-link" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo' + (isPopup ? " card-photo-popup" : "") + '" src="' + e.photo + '" alt="" /></div>' : "") +
+      (isPopup && e.photo ? '<div class="card-photo-link" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo card-photo-popup" src="' + e.photo + '" alt="" /></div>' : "") +
       (e.notes ? '<div class="card-notes">' + escapeHtml(e.notes) + "</div>" : "") +
       (tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "");
     var hasDetails = !!(metaBits.length || e.photo || e.notes || tags.length);
+    var isOwner = !!(e.ownerId && auth.currentUser && e.ownerId === auth.currentUser.uid);
+    var visibilityActionHtml = (!isPopup && visibilityTagText)
+      ? (isOwner
+          ? '<button type="button" class="visibility-cycle-btn">' + visibilityTagText + "</button>"
+          : '<span class="visibility-readonly">' + visibilityTagText + "</span>")
+      : "";
+    var sidePhotoHtml = (!isPopup && e.photo)
+      ? '<div class="card-photo-link card-photo-link-side" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo card-photo-side" src="' + e.photo + '" alt="" /></div>'
+      : "";
     return '' +
       '<div class="card" data-id="' + e.id + '">' +
         '<div class="card-top">' +
@@ -561,6 +575,7 @@
               ? (hasDetails ? '<button type="button" class="details-toggle">Details ▾</button><div class="details-panel" hidden>' + detailsContent + "</div>" : "")
               : detailsContent) +
             '<div class="card-actions' + (isPopup ? " card-actions-compact" : "") + '">' +
+              visibilityActionHtml +
               (showMapsLinks ? '<a href="' + links.apple + '" target="_blank" rel="noopener">Apple Maps</a><a href="' + links.google + '" target="_blank" rel="noopener">Google Maps</a>' : "") +
               (isPopup ? "" : '<button type="button" class="locate-on-map">Auf Karte</button>') +
               (isPopup
@@ -568,6 +583,7 @@
                 : '<button type="button" class="edit-btn">Bearbeiten</button><button type="button" class="danger delete-btn">Löschen</button>') +
             "</div>" +
           "</div>" +
+          sidePhotoHtml +
         "</div>" +
       "</div>";
   }
@@ -989,6 +1005,20 @@
       if (hasPolygon(entry)) map.fitBounds(L.latLngBounds(polygonLatLngs(entry)), { padding: [40, 40], maxZoom: 16 });
       else map.setView([entry.lat, entry.lng], 15);
       setTimeout(function () { if (markers[entry.id]) markers[entry.id].openPopup(); }, 300);
+    }
+    if (ev.target.closest(".visibility-cycle-btn")) {
+      var vBtn = ev.target.closest(".visibility-cycle-btn");
+      var myUid = auth.currentUser && auth.currentUser.uid;
+      if (!myUid || entry.ownerId !== myUid) return;
+      var idx = VISIBILITY_LEVELS.indexOf(entry.visibility || "privat");
+      var next = VISIBILITY_LEVELS[(idx + 1) % VISIBILITY_LEVELS.length];
+      vBtn.disabled = true;
+      db.collection("entries").doc(entry.id).update({ visibility: next, visibleTo: computeVisibleTo(myUid, next) })
+        .then(function () { showToast(VISIBILITY_LABEL[next] + " gesetzt"); })
+        .catch(function (err) {
+          vBtn.disabled = false;
+          showToast("Fehler: " + (err && err.message ? err.message : "unbekannt"));
+        });
     }
   });
 
