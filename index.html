@@ -211,6 +211,12 @@
   .sheet-backdrop { position: fixed; inset: 0; background: rgba(6,20,22,0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; }
   .sheet { width: 100%; max-width: 520px; max-height: min(88vh, 720px); overflow-y: auto; background: var(--surface); border-radius: 18px 18px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow: var(--shadow); }
   .sheet h2 { margin: 0 0 12px; font-size: 1.2rem; }
+  .sheet h3 { margin: 16px 0 8px; font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+  .conn-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .conn-row span { flex: 1; min-width: 0; font-size: 0.92rem; }
+  .conn-row .btn-secondary { flex: 0 0 auto; padding: 6px 10px; font-size: 0.8rem; }
+  .conn-tier-picker { display: flex; gap: 6px; margin: 0; flex: 0 0 100%; }
+  .conn-tier-picker .type-opt { padding: 5px 10px; font-size: 0.76rem; }
   .type-picker { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
   .type-opt { border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); padding: 7px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
   .type-opt[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -339,6 +345,9 @@
   var PARKING_CLASSES = ["tag", "nacht"];
   var PARKING_CLASS_LABEL = { tag: "Tagsüber", nacht: "Übernachtung möglich" };
   var PARKING_ICON_SRC = { tag: "icons/parken-tag.svg", nacht: "icons/parken-nacht.svg" };
+  var VISIBILITY_LEVELS = ["privat", "community", "familyfriends"];
+  var VISIBILITY_LABEL = { privat: "Privat", community: "Community", familyfriends: "Family&Friends" };
+  var VISIBILITY_ICON = { privat: "🔒", community: "🌐", familyfriends: "👪" };
 
   function spotClassOf(e) {
     if (e.spotClass) return e.spotClass;
@@ -354,6 +363,9 @@
     var text = ((e.name || "") + " " + (e.notes || "")).toLowerCase();
     if (text.indexOf("camp") !== -1 || text.indexOf("übernacht") !== -1 || text.indexOf("wohnmobil") !== -1) return "nacht";
     return "tag";
+  }
+  function visibilityOf(e) {
+    return e.visibility || "community";
   }
   function colorForEntry(e) {
     if (e.type === "schutzzone") return cssVar(zoneClassOf(e) === "zeitlich" ? "--schutzzone-zeitlich" : "--schutzzone-ganzjaehrig");
@@ -386,6 +398,53 @@
   var unsubscribeEntries = null;
   var firstSnapshotHandled = false;
   var seedingInProgress = false;
+
+  // ---- Vernetzung: eigene Verbindungen + Einstufungen, im Speicher gehalten ----
+  var myDefaultVisibility = "privat";
+  var myConnections = [];       // [{id, otherUid, status, requestedBy}]
+  var myTiers = {};             // { otherUid: "community" | "familyfriends" }
+  var unsubscribeConnections = null;
+  var unsubscribeTiers = null;
+
+  function computeVisibleTo(ownerUid, visibility) {
+    if (visibility === "privat") return [ownerUid];
+    var uids = [ownerUid];
+    myConnections.forEach(function (c) {
+      if (c.status !== "accepted") return;
+      var tier = myTiers[c.otherUid];
+      if (!tier) return;
+      if (visibility === "familyfriends" && tier === "familyfriends") uids.push(c.otherUid);
+      else if (visibility === "community" && (tier === "familyfriends" || tier === "community")) uids.push(c.otherUid);
+    });
+    return uids;
+  }
+  function chunk(arr, size) {
+    var out = [];
+    for (var i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+  function refreshOwnEntriesVisibility() {
+    var uid = auth.currentUser && auth.currentUser.uid;
+    if (!uid) return Promise.resolve();
+    return db.collection("entries").where("ownerId", "==", uid).get().then(function (snap) {
+      var toUpdate = [];
+      snap.forEach(function (doc) {
+        var e = doc.data();
+        if (e.visibility === "privat") return; // visibleTo ist immer nur [uid], nichts zu tun
+        toUpdate.push({ id: doc.id, visibleTo: computeVisibleTo(uid, e.visibility || "privat") });
+      });
+      var batches = chunk(toUpdate, 400);
+      var p = Promise.resolve();
+      batches.forEach(function (group) {
+        p = p.then(function () {
+          var batch = db.batch();
+          group.forEach(function (u) { batch.update(db.collection("entries").doc(u.id), { visibleTo: u.visibleTo }); });
+          return batch.commit();
+        });
+      });
+      return p;
+    });
+  }
 
   var listRoot = document.getElementById("listRoot");
   var statsRow = document.getElementById("statsRow");
@@ -439,6 +498,7 @@
 
   function cardTags(e) {
     var tags = [];
+    if (e.visibility) tags.push(VISIBILITY_ICON[e.visibility] + " " + VISIBILITY_LABEL[e.visibility]);
     if (e.type === "catch" && e.landed === false) tags.push("Nur Biss – nicht gelandet");
     if (e.type === "spot" && spotClassOf(e) !== "spot") tags.push(SPOT_CLASS_LABEL[spotClassOf(e)]);
     if (e.type === "schutzzone") tags.push(ZONE_CLASS_LABEL[zoneClassOf(e)]);
@@ -788,7 +848,7 @@
   function subscribeEntries() {
     firstSnapshotHandled = false;
     if (unsubscribeEntries) unsubscribeEntries();
-    unsubscribeEntries = db.collection("entries").onSnapshot(function (snap) {
+    unsubscribeEntries = db.collection("entries").where("visibleTo", "array-contains", auth.currentUser.uid).onSnapshot(function (snap) {
       var docs = [];
       snap.forEach(function (doc) {
         var d = doc.data();
@@ -810,10 +870,50 @@
     });
   }
 
+  var connectionsLoadedOnce = false, tiersLoadedOnce = false, reconciledThisSession = false;
+
+  function maybeReconcileVisibilityOnce() {
+    if (reconciledThisSession || !connectionsLoadedOnce || !tiersLoadedOnce) return;
+    reconciledThisSession = true;
+    // Holt Verbindungs-/Einstufungsänderungen nach, die passiert sind während diese Sitzung nicht offen war.
+    refreshOwnEntriesVisibility();
+  }
+
+  function subscribeConnections() {
+    var uid = auth.currentUser.uid;
+    if (unsubscribeConnections) unsubscribeConnections();
+    unsubscribeConnections = db.collection("connections").where("users", "array-contains", uid).onSnapshot(function (snap) {
+      var list = [];
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        var otherUid = d.users[0] === uid ? d.users[1] : d.users[0];
+        list.push({ id: doc.id, otherUid: otherUid, status: d.status, requestedBy: d.requestedBy });
+      });
+      myConnections = list;
+      connectionsLoadedOnce = true;
+      maybeReconcileVisibilityOnce();
+      renderConnectionsSheetIfOpen();
+    }, function (err) { console.error("Verbindungen-Fehler", err); });
+    if (unsubscribeTiers) unsubscribeTiers();
+    unsubscribeTiers = db.collection("users").doc(uid).collection("private").doc("connectionTiers").onSnapshot(function (doc) {
+      myTiers = (doc.exists && doc.data().tiers) || {};
+      tiersLoadedOnce = true;
+      maybeReconcileVisibilityOnce();
+      renderConnectionsSheetIfOpen();
+    }, function (err) { console.error("Einstufungen-Fehler", err); });
+  }
+
   function unsubscribeAndReset() {
     if (unsubscribeEntries) { unsubscribeEntries(); unsubscribeEntries = null; }
+    if (unsubscribeConnections) { unsubscribeConnections(); unsubscribeConnections = null; }
+    if (unsubscribeTiers) { unsubscribeTiers(); unsubscribeTiers = null; }
     state.entries = [];
+    myConnections = [];
+    myTiers = {};
     firstSnapshotHandled = false;
+    connectionsLoadedOnce = false;
+    tiersLoadedOnce = false;
+    reconciledThisSession = false;
   }
 
   map.on("popupopen", function () {
@@ -950,6 +1050,7 @@
   var currentSpotClass = "spot", currentZoneClass = "ganzjaehrig";
   var currentGoodMonths = [], currentSubstrate = [];
   var currentParkingClass = "tag";
+  var currentVisibility = "privat";
   var currentPhoto = null, photoProcessing = false, photoRequestId = 0;
   var positionTouchedByUser = false;
   var PHOTO_MAX_BYTES = 650000;
@@ -1004,6 +1105,7 @@
         '<div class="form-hint" id="photoHint"></div>' +
       "</div>" +
       '<div class="field"><label for="f_notes">Notizen</label><textarea id="f_notes" placeholder="Köder, Bedingungen, Beobachtungen …"></textarea></div>' +
+      '<div id="visibilityPickerContainer"></div>' +
       '<div class="sheet-actions">' +
         '<button type="button" class="btn-secondary" id="cancelBtn">Abbrechen</button>' +
         '<button type="button" class="btn-primary" id="saveBtn">Speichern</button>' +
@@ -1175,6 +1277,15 @@
       "</div></div>";
   }
 
+  function visibilityPickerHtml() {
+    return '<div class="field"><label>Sichtbarkeit</label><div class="type-picker" id="visibilityPicker">' +
+      VISIBILITY_LEVELS.map(function (v) {
+        return '<button type="button" class="type-opt" data-class="' + v + '" aria-pressed="' + (currentVisibility === v) + '">' + VISIBILITY_ICON[v] + " " + VISIBILITY_LABEL[v] + "</button>";
+      }).join("") +
+      '<div class="form-hint">Privat: nur du. Family&amp;Friends: nur diese Verbindungen. Community: alle deine Verbindungen.</div>' +
+      "</div></div>";
+  }
+
   function monthPickerHtml() {
     return '<div class="field"><label>Fängig in diesen Monaten</label><div class="type-picker" id="monthPicker">' +
       MONTHS.map(function (m) {
@@ -1305,6 +1416,7 @@
     currentGoodMonths = entry && entry.goodMonths ? entry.goodMonths.slice() : [];
     currentSubstrate = entry && entry.substrate ? entry.substrate.slice() : [];
     currentParkingClass = entry ? parkingClassOf(entry) : "tag";
+    currentVisibility = entry ? visibilityOf(entry) : myDefaultVisibility;
     currentPhoto = entry && entry.photo ? entry.photo : null;
     photoProcessing = false;
     photoRequestId++;
@@ -1313,6 +1425,15 @@
     setType(currentType);
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
       btn.addEventListener("click", function () { currentLanded = true; setType(btn.getAttribute("data-type")); });
+    });
+    document.getElementById("visibilityPickerContainer").innerHTML = visibilityPickerHtml();
+    document.querySelectorAll("#visibilityPicker .type-opt").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        currentVisibility = btn.getAttribute("data-class");
+        document.querySelectorAll("#visibilityPicker .type-opt").forEach(function (b) {
+          b.setAttribute("aria-pressed", b.getAttribute("data-class") === currentVisibility ? "true" : "false");
+        });
+      });
     });
     if (entry) {
       document.getElementById("f_name").value = entry.name || "";
@@ -2064,7 +2185,9 @@
       substrate: currentType === "spot" ? currentSubstrate.slice() : null,
       parkingClass: currentType === "parking" ? currentParkingClass : null,
       photo: currentPhoto || null,
-      notes: document.getElementById("f_notes").value.trim() || null
+      notes: document.getElementById("f_notes").value.trim() || null,
+      visibility: currentVisibility,
+      visibleTo: computeVisibleTo(auth.currentUser.uid, currentVisibility)
     };
     if (currentType === "catch") {
       var g = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
@@ -2104,6 +2227,7 @@
     } else {
       data.createdAt = new Date().toISOString();
       data.createdBy = auth.currentUser ? (auth.currentUser.displayName || auth.currentUser.email) : null;
+      data.ownerId = auth.currentUser.uid;
       promise = db.collection("entries").add(data);
     }
     promise.then(function () {
@@ -2281,18 +2405,224 @@
     });
   }
 
+  function migrateOwnership() {
+    var btn = document.getElementById("migrateOwnershipBtn");
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Prüfe …";
+    var uid = auth.currentUser.uid;
+    db.collection("entries").get().then(function (snap) {
+      var toMigrate = [];
+      snap.forEach(function (doc) { if (!doc.data().ownerId) toMigrate.push(doc.id); });
+      if (!toMigrate.length) {
+        showToast("Alle Einträge sind bereits umgestellt");
+        btn.textContent = "Bereits umgestellt";
+        return;
+      }
+      btn.textContent = "Umstellung läuft …";
+      var visibleTo = computeVisibleTo(uid, "community");
+      var batches = chunk(toMigrate, 400);
+      var p = Promise.resolve();
+      batches.forEach(function (ids) {
+        p = p.then(function () {
+          var batch = db.batch();
+          ids.forEach(function (id) {
+            batch.update(db.collection("entries").doc(id), { ownerId: uid, visibility: "community", visibleTo: visibleTo });
+          });
+          return batch.commit();
+        });
+      });
+      return p.then(function () {
+        showToast(toMigrate.length + " Einträge umgestellt");
+        btn.textContent = "Umgestellt (" + toMigrate.length + ")";
+      });
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.textContent = original;
+      showToast("Umstellung fehlgeschlagen: " + (err && err.message ? err.message : "unbekannt"));
+    });
+  }
+
+  // ---- Verbindungen-Sheet ----
+  var connectionsUsersCache = {};
+
+  function otherUserLabel(uid) {
+    var u = connectionsUsersCache[uid];
+    return u ? (u.displayName || u.email || uid) : uid;
+  }
+
+  function sendConnectionRequest(otherUid) {
+    var myUid = auth.currentUser.uid;
+    var ids = [myUid, otherUid].sort();
+    var connId = ids[0] + "_" + ids[1];
+    db.collection("connections").doc(connId).set({
+      users: ids, status: "pending", requestedBy: myUid,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    }).then(function () { showToast("Anfrage gesendet"); }).catch(function (err) {
+      showToast("Fehler: " + (err && err.message ? err.message : "unbekannt"));
+    });
+  }
+
+  function acceptConnection(connId) {
+    db.collection("connections").doc(connId).update({ status: "accepted", updatedAt: new Date().toISOString() })
+      .then(function () { showToast("Verbindung bestätigt"); refreshOwnEntriesVisibility(); })
+      .catch(function (err) { showToast("Fehler: " + (err && err.message ? err.message : "unbekannt")); });
+  }
+
+  function removeConnection(connId, otherUid) {
+    var myUid = auth.currentUser.uid;
+    var tierRef = db.collection("users").doc(myUid).collection("private").doc("connectionTiers");
+    db.collection("connections").doc(connId).delete()
+      .then(function () {
+        return tierRef.get().then(function (doc) {
+          var tiers = (doc.exists && doc.data().tiers) || {};
+          if (!(otherUid in tiers)) return;
+          delete tiers[otherUid];
+          return tierRef.set({ tiers: tiers }, { merge: true });
+        });
+      })
+      .then(function () { showToast("Entfernt"); refreshOwnEntriesVisibility(); })
+      .catch(function (err) { showToast("Fehler: " + (err && err.message ? err.message : "unbekannt")); });
+  }
+
+  function setConnectionTier(otherUid, tier) {
+    var myUid = auth.currentUser.uid;
+    var tierRef = db.collection("users").doc(myUid).collection("private").doc("connectionTiers");
+    tierRef.get().then(function (doc) {
+      var tiers = (doc.exists && doc.data().tiers) || {};
+      tiers[otherUid] = tier;
+      return tierRef.set({ tiers: tiers }, { merge: true });
+    }).then(function () { refreshOwnEntriesVisibility(); })
+      .catch(function (err) { showToast("Fehler: " + (err && err.message ? err.message : "unbekannt")); });
+  }
+
+  function renderConnectionsDynamic() {
+    var myUid = auth.currentUser.uid;
+    var incoming = myConnections.filter(function (c) { return c.status === "pending" && c.requestedBy !== myUid; });
+    var outgoing = myConnections.filter(function (c) { return c.status === "pending" && c.requestedBy === myUid; });
+    var accepted = myConnections.filter(function (c) { return c.status === "accepted"; });
+
+    var incomingEl = document.getElementById("connPendingIncoming");
+    if (incomingEl) {
+      incomingEl.innerHTML = incoming.length ? incoming.map(function (c) {
+        return '<div class="conn-row"><span>' + escapeHtml(otherUserLabel(c.otherUid)) + '</span>' +
+          '<button type="button" class="btn-secondary" data-accept="' + c.id + '">Annehmen</button>' +
+          '<button type="button" class="btn-secondary" data-remove="' + c.id + '" data-other="' + c.otherUid + '">Ablehnen</button></div>';
+      }).join("") : '<div class="form-hint">Keine eingehenden Anfragen.</div>';
+    }
+    var outgoingEl = document.getElementById("connPendingOutgoing");
+    if (outgoingEl) {
+      outgoingEl.innerHTML = outgoing.length ? outgoing.map(function (c) {
+        return '<div class="conn-row"><span>' + escapeHtml(otherUserLabel(c.otherUid)) + '</span>' +
+          '<button type="button" class="btn-secondary" data-remove="' + c.id + '" data-other="' + c.otherUid + '">Zurückziehen</button></div>';
+      }).join("") : '<div class="form-hint">Keine ausgehenden Anfragen.</div>';
+    }
+    var acceptedEl = document.getElementById("connAccepted");
+    if (acceptedEl) {
+      acceptedEl.innerHTML = accepted.length ? accepted.map(function (c) {
+        var tier = myTiers[c.otherUid] || null;
+        return '<div class="conn-row conn-row-accepted"><span>' + escapeHtml(otherUserLabel(c.otherUid)) + '</span>' +
+          '<div class="type-picker conn-tier-picker" data-other="' + c.otherUid + '">' +
+            '<button type="button" class="type-opt" data-tier="community" aria-pressed="' + (tier === "community") + '">🌐 Community</button>' +
+            '<button type="button" class="type-opt" data-tier="familyfriends" aria-pressed="' + (tier === "familyfriends") + '">👪 Family&amp;Friends</button>' +
+          "</div>" +
+          '<button type="button" class="btn-secondary" data-remove="' + c.id + '" data-other="' + c.otherUid + '">Entfernen</button></div>';
+      }).join("") : '<div class="form-hint">Noch keine bestätigten Verbindungen.</div>';
+    }
+
+    document.querySelectorAll("#connectionsBackdrop [data-accept]").forEach(function (btn) {
+      btn.onclick = function () { acceptConnection(btn.getAttribute("data-accept")); };
+    });
+    document.querySelectorAll("#connectionsBackdrop [data-remove]").forEach(function (btn) {
+      btn.onclick = function () { removeConnection(btn.getAttribute("data-remove"), btn.getAttribute("data-other")); };
+    });
+    document.querySelectorAll("#connectionsBackdrop .conn-tier-picker .type-opt").forEach(function (btn) {
+      btn.onclick = function () {
+        var picker = btn.closest(".conn-tier-picker");
+        var otherUid = picker.getAttribute("data-other");
+        var tier = btn.getAttribute("data-tier");
+        picker.querySelectorAll(".type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+        setConnectionTier(otherUid, tier);
+      };
+    });
+  }
+
+  function renderConnectionsSheetIfOpen() {
+    if (document.getElementById("connectionsBackdrop")) renderConnectionsDynamic();
+  }
+
+  function renderConnectionSearchResults(query) {
+    var myUid = auth.currentUser.uid;
+    var connectedOrPendingUids = {};
+    myConnections.forEach(function (c) { connectedOrPendingUids[c.otherUid] = true; });
+    var q = query.trim().toLowerCase();
+    var results = Object.keys(connectionsUsersCache).filter(function (uid) {
+      if (uid === myUid || connectedOrPendingUids[uid]) return false;
+      if (!q) return false;
+      var u = connectionsUsersCache[uid];
+      return (u.displayName || "").toLowerCase().indexOf(q) !== -1 || (u.email || "").toLowerCase().indexOf(q) !== -1;
+    });
+    var el = document.getElementById("connSearchResults");
+    if (!el) return;
+    el.innerHTML = results.length ? results.map(function (uid) {
+      return '<div class="conn-row"><span>' + escapeHtml(otherUserLabel(uid)) + '</span>' +
+        '<button type="button" class="btn-secondary" data-request="' + uid + '">Anfrage senden</button></div>';
+    }).join("") : (q ? '<div class="form-hint">Keine Treffer.</div>' : "");
+    el.querySelectorAll("[data-request]").forEach(function (btn) {
+      btn.onclick = function () { sendConnectionRequest(btn.getAttribute("data-request")); btn.disabled = true; btn.textContent = "Angefragt"; };
+    });
+  }
+
+  function openConnectionsSheet() {
+    var user = auth.currentUser;
+    if (!user) return;
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="connectionsBackdrop"><div class="sheet">' +
+        '<h2>Verbindungen</h2>' +
+        '<div class="field"><label for="connSearchInput">Freunde finden (Name oder E-Mail)</label><input id="connSearchInput" type="text" placeholder="Suchen …" /></div>' +
+        '<div id="connSearchResults"></div>' +
+        '<h3>Anfragen erhalten</h3><div id="connPendingIncoming"></div>' +
+        '<h3>Anfragen gesendet</h3><div id="connPendingOutgoing"></div>' +
+        '<h3>Verbunden</h3><div id="connAccepted"></div>' +
+        '<div class="sheet-actions">' +
+          '<button type="button" class="btn-secondary" id="connectionsCloseBtn">Schließen</button>' +
+        "</div>" +
+      "</div></div>");
+    var backdrop = document.getElementById("connectionsBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("connectionsCloseBtn").addEventListener("click", close);
+    document.getElementById("connSearchInput").addEventListener("input", function (ev) { renderConnectionSearchResults(ev.target.value); });
+    renderConnectionsDynamic();
+    db.collection("users").get().then(function (snap) {
+      var cache = {};
+      snap.forEach(function (doc) { cache[doc.id] = doc.data(); });
+      connectionsUsersCache = cache;
+      renderConnectionsDynamic();
+      renderConnectionSearchResults(document.getElementById("connSearchInput").value);
+    }).catch(function (err) { console.error("Nutzerliste-Fehler", err); });
+  }
+
   function openProfileSheet() {
     var user = auth.currentUser;
     if (!user) return;
+    var pendingDefaultVisibility = myDefaultVisibility;
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="profileBackdrop"><div class="sheet">' +
         '<h2>Profil</h2>' +
         '<div class="field"><label for="p_name">Name</label><input id="p_name" type="text" value="' + escapeHtml(user.displayName || "") + '" /></div>' +
         '<div class="field"><label for="p_email">E-Mail</label><input id="p_email" type="text" value="' + escapeHtml(user.email || "") + '" disabled /></div>' +
+        '<div class="field"><label>Standard-Sichtbarkeit für neue Einträge</label><div class="type-picker" id="defaultVisibilityPicker">' +
+          VISIBILITY_LEVELS.map(function (v) {
+            return '<button type="button" class="type-opt" data-class="' + v + '" aria-pressed="' + (pendingDefaultVisibility === v) + '">' + VISIBILITY_ICON[v] + " " + VISIBILITY_LABEL[v] + "</button>";
+          }).join("") +
+        "</div></div>" +
         '<div class="sheet-actions">' +
           '<button type="button" class="btn-secondary" id="profileCloseBtn">Schließen</button>' +
           '<button type="button" class="btn-primary" id="profileSaveBtn">Speichern</button>' +
         "</div>" +
+        '<button type="button" class="btn-secondary" id="openConnectionsBtn" style="width:100%;margin-top:10px">🤝 Verbindungen</button>' +
+        '<button type="button" class="btn-secondary" id="migrateOwnershipBtn" style="width:100%;margin-top:10px">🔄 Bestehende Einträge auf Vernetzung umstellen (einmalig)</button>' +
         '<button type="button" class="btn-secondary" id="importPolygonsBtn" style="width:100%;margin-top:10px">🗺️ Flächen aus KML importieren (einmalig)</button>' +
         '<button type="button" class="btn-secondary" id="importRuegenBtn" style="width:100%;margin-top:10px">🗺️ Rügen-Spots aus KML importieren (einmalig)</button>' +
         '<button type="button" class="btn-secondary" id="profileSignOutBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Abmelden</button>' +
@@ -2301,6 +2631,16 @@
     function close() { backdrop.remove(); }
     backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("profileCloseBtn").addEventListener("click", close);
+    document.querySelectorAll("#defaultVisibilityPicker .type-opt").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        pendingDefaultVisibility = btn.getAttribute("data-class");
+        document.querySelectorAll("#defaultVisibilityPicker .type-opt").forEach(function (b) {
+          b.setAttribute("aria-pressed", b.getAttribute("data-class") === pendingDefaultVisibility ? "true" : "false");
+        });
+      });
+    });
+    document.getElementById("openConnectionsBtn").addEventListener("click", function () { close(); openConnectionsSheet(); });
+    document.getElementById("migrateOwnershipBtn").addEventListener("click", migrateOwnership);
     document.getElementById("importPolygonsBtn").addEventListener("click", importPolygonsFromKml);
     document.getElementById("importRuegenBtn").addEventListener("click", importRuegenFromKml);
     document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
@@ -2311,6 +2651,9 @@
       btn.disabled = true;
       btn.textContent = "Speichert …";
       user.updateProfile({ displayName: newName }).then(function () {
+        return db.collection("users").doc(user.uid).set({ defaultVisibility: pendingDefaultVisibility, updatedAt: new Date().toISOString() }, { merge: true });
+      }).then(function () {
+        myDefaultVisibility = pendingDefaultVisibility;
         showToast("Gespeichert");
         close();
       }).catch(function () {
@@ -2322,12 +2665,26 @@
   }
   document.getElementById("profileBtn").addEventListener("click", openProfileSheet);
 
+  function upsertUserDoc(user) {
+    var ref = db.collection("users").doc(user.uid);
+    return ref.get().then(function (doc) {
+      if (doc.exists) {
+        myDefaultVisibility = doc.data().defaultVisibility || "privat";
+        return ref.update({ displayName: user.displayName || "", email: user.email || "", updatedAt: new Date().toISOString() });
+      }
+      myDefaultVisibility = "privat";
+      return ref.set({ displayName: user.displayName || "", email: user.email || "", defaultVisibility: "privat", updatedAt: new Date().toISOString() });
+    }).catch(function (err) { console.error("User-Profil-Fehler", err); });
+  }
+
   auth.onAuthStateChanged(function (user) {
     authLoadingEl.hidden = true;
     if (user) {
       authScreenEl.hidden = true;
       appEl.hidden = false;
+      upsertUserDoc(user);
       subscribeEntries();
+      subscribeConnections();
     } else {
       appEl.hidden = true;
       unsubscribeAndReset();
