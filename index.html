@@ -578,21 +578,44 @@
 
   var photoBlobCache = {};
 
+  var PHOTO_CACHE_NAME = "melog-photos-v1";
+
+  function photoStorageUrl(path) {
+    return "https://firebasestorage.googleapis.com/v0/b/" + firebaseConfig.storageBucket + "/o/" + encodeURIComponent(path) + "?alt=media";
+  }
+
   function loadPhotoBlobUrl(path) {
     if (!photoBlobCache[path]) {
-      var p = auth.currentUser.getIdToken().then(function (idToken) {
-        var url = "https://firebasestorage.googleapis.com/v0/b/" + firebaseConfig.storageBucket + "/o/" + encodeURIComponent(path) + "?alt=media";
-        return fetch(url, { headers: { Authorization: "Bearer " + idToken } });
-      }).then(function (res) {
-        if (!res.ok) throw new Error("Foto-Download fehlgeschlagen (" + res.status + ")");
-        return res.blob();
-      }).then(function (blob) {
-        return URL.createObjectURL(blob);
-      });
+      var url = photoStorageUrl(path);
+      var p = (window.caches ? caches.open(PHOTO_CACHE_NAME).then(function (c) { return c.match(url); }) : Promise.resolve(undefined))
+        .then(function (cached) {
+          if (cached) return cached.blob();
+          return auth.currentUser.getIdToken().then(function (idToken) {
+            return fetch(url, { headers: { Authorization: "Bearer " + idToken } });
+          }).then(function (res) {
+            if (!res.ok) throw new Error("Foto-Download fehlgeschlagen (" + res.status + ")");
+            if (window.caches) {
+              var toCache = res.clone();
+              caches.open(PHOTO_CACHE_NAME).then(function (c) { c.put(url, toCache); }).catch(function () {});
+            }
+            return res.blob();
+          });
+        })
+        .then(function (blob) {
+          return URL.createObjectURL(blob);
+        });
       p.catch(function () { if (photoBlobCache[path] === p) delete photoBlobCache[path]; });
       photoBlobCache[path] = p;
     }
     return photoBlobCache[path];
+  }
+
+  function invalidatePhotoCache(path) {
+    if (!path) return;
+    delete photoBlobCache[path];
+    if (window.caches) {
+      caches.open(PHOTO_CACHE_NAME).then(function (c) { c.delete(photoStorageUrl(path)); }).catch(function () {});
+    }
   }
 
   function photoImgAttr(photo) {
@@ -2471,6 +2494,7 @@
       saveBtn.textContent = "Lädt Foto hoch …";
       photoStep = storage.ref(photoPath).putString(currentPhoto, "data_url", { contentType: "image/jpeg" }).then(function () {
         data.photo = photoPath;
+        invalidatePhotoCache(photoPath);
       });
     } else {
       data.photo = currentPhoto || null;
@@ -2486,7 +2510,10 @@
       data.ownerId = auth.currentUser.uid;
       return db.collection("entries").doc(entryId).set(data);
     }).then(function () {
-      if (photoRemoved) storage.ref(originalPhotoPath).delete().catch(function () {});
+      if (photoRemoved) {
+        storage.ref(originalPhotoPath).delete().catch(function () {});
+        invalidatePhotoCache(originalPhotoPath);
+      }
       closeSheet();
       showToast("Gespeichert");
       if (wasNewEntry) {
@@ -2502,7 +2529,10 @@
 
   function deleteEntry(entry) {
     db.collection("entries").doc(entry.id).delete().then(function () {
-      if (entry.photo && entry.photo.indexOf("data:") !== 0) storage.ref(entry.photo).delete().catch(function () {});
+      if (entry.photo && entry.photo.indexOf("data:") !== 0) {
+        storage.ref(entry.photo).delete().catch(function () {});
+        invalidatePhotoCache(entry.photo);
+      }
       showToast("Gelöscht");
     }).catch(function (err) {
       showToast("Konnte nicht gelöscht werden: " + (err && err.message ? err.message : "unbekannter Fehler"));
