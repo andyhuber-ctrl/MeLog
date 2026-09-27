@@ -8,7 +8,7 @@ service firebase.storage {
     }
 
     match /photos/{ownerId}/{entryId} {
-      allow read: if isAllowedUser()
+      allow read: if request.auth != null
         && request.auth.uid in firestore.get(/databases/(default)/documents/entries/$(entryId)).data.visibleTo;
 
       allow write: if isAllowedUser()
