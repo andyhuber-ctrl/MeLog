@@ -394,6 +394,7 @@
   var VISIBILITY_LEVELS = ["privat", "community", "familyfriends"];
   var VISIBILITY_LABEL = { privat: "Privat", community: "Community", familyfriends: "Family&Friends" };
   var VISIBILITY_ICON = { privat: "🔒", community: "🌐", familyfriends: "👪" };
+  var ADMIN_EMAIL = "andy_huber@gmx.net";
 
   function spotClassOf(e) {
     if (e.spotClass) return e.spotClass;
@@ -2860,6 +2861,25 @@
     }).catch(function (err) { console.error("Nutzerliste-Fehler", err); });
   }
 
+  function allowNewUser() {
+    var input = document.getElementById("p_new_user_email");
+    var email = input.value.trim().toLowerCase();
+    if (!email || email.indexOf("@") === -1) { showToast("Bitte eine gültige E-Mail-Adresse eingeben"); return; }
+    var btn = document.getElementById("allowUserBtn");
+    btn.disabled = true;
+    btn.textContent = "Schalte frei …";
+    db.collection("allowedEmails").doc(email).set({ addedAt: new Date().toISOString(), addedBy: auth.currentUser.email }).then(function () {
+      showToast(email + " freigeschaltet");
+      input.value = "";
+      btn.disabled = false;
+      btn.textContent = "✅ Freischalten";
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.textContent = "✅ Freischalten";
+      showToast("Fehlgeschlagen: " + (err && err.message ? err.message : "unbekannt"));
+    });
+  }
+
   function openProfileSheet() {
     var user = auth.currentUser;
     if (!user) return;
@@ -2881,6 +2901,11 @@
         '<button type="button" class="btn-secondary" id="openConnectionsBtn" style="width:100%;margin-top:10px">🤝 Mit anderen Usern vernetzen</button>' +
         '<button type="button" class="btn-secondary" id="migrateOwnershipBtn" style="width:100%;margin-top:10px">🔄 Bestehende Einträge auf Vernetzung umstellen (einmalig)</button>' +
         '<button type="button" class="btn-secondary" id="migratePhotosBtn" style="width:100%;margin-top:10px">📷 Fotos in Cloud Storage verschieben (einmalig)</button>' +
+        (user.email === ADMIN_EMAIL
+          ? '<div class="field" style="margin-top:14px"><label for="p_new_user_email">Neuen User freischalten</label>' +
+              '<input id="p_new_user_email" type="email" placeholder="email@beispiel.de" /></div>' +
+            '<button type="button" class="btn-secondary" id="allowUserBtn" style="width:100%">✅ Freischalten</button>'
+          : "") +
         '<button type="button" class="btn-secondary" id="profileSignOutBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Abmelden</button>' +
       "</div></div>");
     var backdrop = document.getElementById("profileBackdrop");
@@ -2898,6 +2923,9 @@
     document.getElementById("openConnectionsBtn").addEventListener("click", function () { close(); openConnectionsSheet(); });
     document.getElementById("migrateOwnershipBtn").addEventListener("click", migrateOwnership);
     document.getElementById("migratePhotosBtn").addEventListener("click", migratePhotosToStorage);
+    if (user.email === ADMIN_EMAIL) {
+      document.getElementById("allowUserBtn").addEventListener("click", allowNewUser);
+    }
     document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
     document.getElementById("profileSaveBtn").addEventListener("click", function () {
       var newName = document.getElementById("p_name").value.trim();
