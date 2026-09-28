@@ -2120,7 +2120,7 @@
     return best;
   }
 
-  function forecastDayHtml(date, i, daily) {
+  function forecastDayHtml(date, i, daily, current) {
     var code = daily.weathercode[i];
     var label = WEATHER_CODE_LABEL[code] || "";
     var rain = daily.precipitation_sum[i];
@@ -2130,6 +2130,7 @@
       '<div class="mono">' + Math.round(daily.temperature_2m_min[i]) + '°–' + Math.round(daily.temperature_2m_max[i]) + '°C</div>' +
       '<div>Wind ' + degToCompass8(daily.wind_direction_10m_dominant[i]) + ' ' + Math.round(daily.wind_speed_10m_max[i]) + ' km/h</div>' +
       (rain > 0 ? '<div>' + rain + ' mm Regen</div>' : '') +
+      (current ? '<div>Strömung ' + degToCompass8(current.direction) + ' ' + current.velocity.toFixed(1) + ' km/h</div>' : '') +
       '<div class="mono">☀️ ' + daily.sunrise[i].slice(11) + ' · 🌙 ' + daily.sunset[i].slice(11) + '</div>' +
     '</div>';
   }
@@ -2141,16 +2142,29 @@
     var weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lng +
       "&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset&timezone=auto&forecast_days=5";
     var waterUrl = "https://gdi.bsh.de/ldproxy/rest/services/WaterLevelForecast/collections/waterlevelforecastdata/items/" + station.id + "?lang=de&f=json";
+    var marineUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + lat + "&longitude=" + lng +
+      "&hourly=ocean_current_velocity,ocean_current_direction&timezone=auto&forecast_days=5";
     Promise.all([
       fetch(weatherUrl).then(function (r) { return r.json(); }).catch(function () { return null; }),
-      fetch(waterUrl).then(function (r) { return r.json(); }).catch(function () { return null; })
+      fetch(waterUrl).then(function (r) { return r.json(); }).catch(function () { return null; }),
+      fetch(marineUrl).then(function (r) { return r.json(); }).catch(function () { return null; })
     ]).then(function (results) {
-      var weather = results[0], water = results[1];
+      var weather = results[0], water = results[1], marine = results[2];
       var html = "";
       if (weather && weather.daily && weather.daily.time) {
         html += '<div class="forecast-days">' + weather.daily.time.map(function (d, i) {
-          return forecastDayHtml(d, i, weather.daily);
+          var current = null;
+          if (marine && marine.hourly && marine.hourly.time) {
+            var idx = marine.hourly.time.indexOf(d + "T12:00");
+            if (idx !== -1 && marine.hourly.ocean_current_velocity[idx] != null) {
+              current = { velocity: marine.hourly.ocean_current_velocity[idx], direction: marine.hourly.ocean_current_direction[idx] };
+            }
+          }
+          return forecastDayHtml(d, i, weather.daily, current);
         }).join("") + "</div>";
+        if (marine && marine.hourly) {
+          html += '<div class="forecast-water">Strömungsangaben sind eine grobe Schätzung aus einem globalen Ozeanmodell – in flachem Küstenwasser mit Vorsicht zu genießen.</div>';
+        }
       } else {
         html += '<div class="forecast-water">Wettervorhersage aktuell nicht verfügbar.</div>';
       }
