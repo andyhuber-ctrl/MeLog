@@ -1081,9 +1081,12 @@
     }, function (err) {
       console.error("Firestore-Fehler", err);
       document.getElementById("entriesLoadingHint").hidden = true;
-      showAuthError(err.code === "permission-denied"
-        ? "Diese E-Mail hat noch keinen Zugriff. Bitte Andy um Freischaltung bitten."
-        : "Verbindung zur Datenbank verloren.");
+      if (err.code === "permission-denied") {
+        registerPendingUser(auth.currentUser);
+        showAuthError("Diese E-Mail hat noch keinen Zugriff. Bitte Andy um Freischaltung bitten.");
+      } else {
+        showAuthError("Verbindung zur Datenbank verloren.");
+      }
       auth.signOut();
     });
   }
@@ -2861,6 +2864,10 @@
     }).catch(function (err) { console.error("Nutzerliste-Fehler", err); });
   }
 
+  function grantAccess(email) {
+    return db.collection("allowedEmails").doc(email).set({ addedAt: new Date().toISOString(), addedBy: auth.currentUser.email });
+  }
+
   function allowNewUser() {
     var input = document.getElementById("p_new_user_email");
     var email = input.value.trim().toLowerCase();
@@ -2868,7 +2875,7 @@
     var btn = document.getElementById("allowUserBtn");
     btn.disabled = true;
     btn.textContent = "Schalte frei …";
-    db.collection("allowedEmails").doc(email).set({ addedAt: new Date().toISOString(), addedBy: auth.currentUser.email }).then(function () {
+    grantAccess(email).then(function () {
       showToast(email + " freigeschaltet");
       input.value = "";
       btn.disabled = false;
@@ -2877,6 +2884,93 @@
       btn.disabled = false;
       btn.textContent = "✅ Freischalten";
       showToast("Fehlgeschlagen: " + (err && err.message ? err.message : "unbekannt"));
+    });
+  }
+
+  function pendingUserRowHtml(p) {
+    var when = p.requestedAt ? fmtDate(p.requestedAt.slice(0, 10)) : "";
+    return '' +
+      '<div class="card" data-uid="' + p.uid + '" data-email="' + escapeHtml(p.email) + '">' +
+        '<div class="card-top">' +
+          '<div class="card-body">' +
+            '<div class="card-title-row"><div class="card-title">' + escapeHtml(p.email) + '</div></div>' +
+            '<div class="card-meta mono">' + escapeHtml(p.displayName || "") + (when ? " · " + when : "") + '</div>' +
+            '<div class="card-actions">' +
+              '<button type="button" class="pending-allow-btn">✅ Freischalten</button>' +
+              '<button type="button" class="danger pending-reject-btn">✕ Ablehnen</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderPendingUsersList(list) {
+    var root = document.getElementById("pendingUsersRoot");
+    if (!root) return;
+    root.innerHTML = list.length
+      ? list.map(pendingUserRowHtml).join("")
+      : '<div class="empty-state">Keine offenen Anmeldungen.</div>';
+    function removeCard(card) {
+      card.remove();
+      if (!root.querySelector(".card")) root.innerHTML = '<div class="empty-state">Keine offenen Anmeldungen.</div>';
+    }
+    root.querySelectorAll(".pending-allow-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var card = btn.closest(".card");
+        var uid = card.getAttribute("data-uid");
+        var email = card.getAttribute("data-email");
+        btn.disabled = true;
+        grantAccess(email).then(function () {
+          return db.collection("pendingUsers").doc(uid).delete();
+        }).then(function () {
+          showToast(email + " freigeschaltet");
+          removeCard(card);
+        }).catch(function (err) {
+          btn.disabled = false;
+          showToast("Fehlgeschlagen: " + (err && err.message ? err.message : "unbekannt"));
+        });
+      });
+    });
+    root.querySelectorAll(".pending-reject-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var card = btn.closest(".card");
+        var uid = card.getAttribute("data-uid");
+        btn.disabled = true;
+        db.collection("pendingUsers").doc(uid).delete().then(function () {
+          removeCard(card);
+        }).catch(function (err) {
+          btn.disabled = false;
+          showToast("Fehlgeschlagen: " + (err && err.message ? err.message : "unbekannt"));
+        });
+      });
+    });
+  }
+
+  function openPendingUsersSheet() {
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="pendingUsersBackdrop"><div class="sheet">' +
+        '<h2>Neue Anmeldungen</h2>' +
+        '<div id="pendingUsersRoot"><div class="empty-state">Lädt …</div></div>' +
+        '<div class="sheet-actions">' +
+          '<button type="button" class="btn-secondary" id="pendingUsersCloseBtn">Schließen</button>' +
+        "</div>" +
+      "</div></div>");
+    var backdrop = document.getElementById("pendingUsersBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("pendingUsersCloseBtn").addEventListener("click", close);
+    db.collection("pendingUsers").get().then(function (snap) {
+      var list = [];
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        d.uid = doc.id;
+        list.push(d);
+      });
+      list.sort(function (a, b) { return (b.requestedAt || "").localeCompare(a.requestedAt || ""); });
+      renderPendingUsersList(list);
+    }).catch(function (err) {
+      showToast("Konnte Anmeldungen nicht laden: " + (err && err.message ? err.message : "unbekannt"));
+      close();
     });
   }
 
@@ -2902,7 +2996,8 @@
         '<button type="button" class="btn-secondary" id="migrateOwnershipBtn" style="width:100%;margin-top:10px">🔄 Bestehende Einträge auf Vernetzung umstellen (einmalig)</button>' +
         '<button type="button" class="btn-secondary" id="migratePhotosBtn" style="width:100%;margin-top:10px">📷 Fotos in Cloud Storage verschieben (einmalig)</button>' +
         (user.email === ADMIN_EMAIL
-          ? '<div class="field" style="margin-top:14px"><label for="p_new_user_email">Neuen User freischalten</label>' +
+          ? '<button type="button" class="btn-secondary" id="openPendingUsersBtn" style="width:100%;margin-top:10px">📋 Neue Anmeldungen</button>' +
+            '<div class="field" style="margin-top:14px"><label for="p_new_user_email">Neuen User freischalten</label>' +
               '<input id="p_new_user_email" type="email" placeholder="email@beispiel.de" /></div>' +
             '<button type="button" class="btn-secondary" id="allowUserBtn" style="width:100%">✅ Freischalten</button>'
           : "") +
@@ -2925,6 +3020,7 @@
     document.getElementById("migratePhotosBtn").addEventListener("click", migratePhotosToStorage);
     if (user.email === ADMIN_EMAIL) {
       document.getElementById("allowUserBtn").addEventListener("click", allowNewUser);
+      document.getElementById("openPendingUsersBtn").addEventListener("click", function () { close(); openPendingUsersSheet(); });
     }
     document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
     document.getElementById("profileSaveBtn").addEventListener("click", function () {
@@ -2958,6 +3054,14 @@
       myDefaultVisibility = "privat";
       return ref.set({ displayName: user.displayName || "", email: user.email || "", defaultVisibility: "privat", updatedAt: new Date().toISOString() });
     }).catch(function (err) { console.error("User-Profil-Fehler", err); });
+  }
+
+  function registerPendingUser(user) {
+    db.collection("pendingUsers").doc(user.uid).set({
+      email: user.email || "",
+      displayName: user.displayName || "",
+      requestedAt: new Date().toISOString()
+    }).catch(function () {});
   }
 
   auth.onAuthStateChanged(function (user) {
