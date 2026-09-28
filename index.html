@@ -363,7 +363,7 @@
   var SPOT_CLASS_LABEL = { hotspot: "Hotspot", spot: "Spot", potspot: "PotSpot" };
   var ZONE_CLASSES = ["ganzjaehrig", "zeitlich"];
   var ZONE_CLASS_LABEL = { ganzjaehrig: "Ganzjährig", zeitlich: "Zeitlich begrenzt" };
-  var ALWAYS_POLYGON_TYPES = { schutzzone: true };
+  var ALWAYS_POLYGON_TYPES = { schutzzone: true, spot: true };
   var MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
   var SEASONS = ["Frühling", "Sommer", "Herbst", "Winter"];
   var SEASON_MONTHS = { "Frühling": ["Mär", "Apr", "Mai"], "Sommer": ["Jun", "Jul", "Aug"], "Herbst": ["Sep", "Okt", "Nov"], "Winter": ["Dez", "Jan", "Feb"] };
@@ -659,7 +659,9 @@
       : "";
     var metaHtml = metaBits.length ? '<div class="card-meta mono">' + escapeHtml(metaBits.join(" · ")) + "</div>" : "";
     var popupExtrasHtml = isPopup
-      ? metaHtml + (isCatch && e.photo ? '<div class="card-photo-link" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo card-photo-popup"' + photoImgAttr(e.photo) + ' alt="" /></div>' : "")
+      ? metaHtml
+        + (isCatch && e.photo ? '<div class="card-photo-link" role="button" tabindex="0" aria-label="Foto vergrößern"><img class="card-photo card-photo-popup"' + photoImgAttr(e.photo) + ' alt="" /></div>' : "")
+        + (!isCatch && tags.length ? '<div class="card-tags">' + tags.map(function (t) { return '<span class="tag">' + escapeHtml(t) + "</span>"; }).join("") + "</div>" : "")
       : "";
     var detailsContent = !isPopup
       ? metaHtml +
@@ -1476,13 +1478,6 @@
     return '<div class="field"><label for="f_name">Name</label><input id="f_name" type="text" placeholder="z.B. Steinige Kante am Leuchtturm" /></div>';
   }
 
-  function geomPickerHtml() {
-    return '<div class="field"><label>Geometrie</label><div class="type-picker" id="geomPicker">' +
-      '<button type="button" class="type-opt" data-geom="point" aria-pressed="' + (currentGeometry === "point") + '">Punkt</button>' +
-      '<button type="button" class="type-opt" data-geom="polygon" aria-pressed="' + (currentGeometry === "polygon") + '">Fläche</button>' +
-      "</div></div>";
-  }
-
   function spotClassPickerHtml() {
     return '<div class="field"><label>Kategorie</label><div class="type-picker" id="spotClassPicker">' +
       SPOT_CLASSES.map(function (c) {
@@ -1542,7 +1537,7 @@
   }
 
   function updateGeometrySections() {
-    var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType] || (currentType === "spot" && currentGeometry === "polygon");
+    var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType];
     document.getElementById("coordsSection").hidden = currentType === "catch" || isPolygonMode;
     document.getElementById("moveOnMapBtn").hidden = isPolygonMode;
     document.getElementById("polygonSection").hidden = !isPolygonMode;
@@ -1551,12 +1546,11 @@
 
   function setType(type) {
     currentType = type;
-    if (ALWAYS_POLYGON_TYPES[type]) currentGeometry = "polygon";
-    else if (type !== "spot") currentGeometry = "point";
+    currentGeometry = ALWAYS_POLYGON_TYPES[type] ? "polygon" : "point";
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
     document.getElementById("nameFieldContainer").innerHTML = type === "catch" ? "" : nameFieldHtml(false, null);
     var extraHtml = "";
-    if (type === "spot") extraHtml = spotClassPickerHtml() + geomPickerHtml() + monthPickerHtml() + substratePickerHtml();
+    if (type === "spot") extraHtml = spotClassPickerHtml() + monthPickerHtml() + substratePickerHtml();
     else if (type === "schutzzone") extraHtml = zoneClassPickerHtml();
     else if (type === "parking") extraHtml = parkingClassPickerHtml();
     document.getElementById("geomPickerContainer").innerHTML = extraHtml;
@@ -1565,13 +1559,6 @@
         btn.addEventListener("click", function () {
           currentSpotClass = btn.getAttribute("data-class");
           document.querySelectorAll("#spotClassPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-class") === currentSpotClass ? "true" : "false"); });
-        });
-      });
-      document.querySelectorAll("#geomPicker .type-opt").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          currentGeometry = btn.getAttribute("data-geom");
-          document.querySelectorAll("#geomPicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-geom") === currentGeometry ? "true" : "false"); });
-          updateGeometrySections();
         });
       });
       document.querySelectorAll("#monthPicker .type-opt").forEach(function (btn) {
@@ -2012,7 +1999,7 @@
 
   function applyExifIfEmpty(exif) {
     var filled = [];
-    var isPolygonModeNow = !!ALWAYS_POLYGON_TYPES[currentType] || (currentType === "spot" && currentGeometry === "polygon");
+    var isPolygonModeNow = !!ALWAYS_POLYGON_TYPES[currentType];
     var positionEligible = !isPolygonModeNow && !state.editingId && !positionTouchedByUser;
     var hasExifPosition = !!(exif && exif.lat != null && exif.lng != null);
     if (positionEligible && hasExifPosition) {
@@ -2426,7 +2413,7 @@
 
   function saveEntry() {
     if (photoProcessing) { showToast("Foto wird noch komprimiert – bitte kurz warten"); return; }
-    var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType] || (currentType === "spot" && currentGeometry === "polygon");
+    var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType];
     var lat, lng, polygon = null;
     if (isPolygonMode) {
       if (pendingPolygon.length < 3) { showToast("Bitte zuerst eine Fläche mit mindestens 3 Punkten zeichnen"); return; }
