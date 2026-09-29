@@ -931,38 +931,65 @@
   var SCHUTZZONE_LAND_LABEL = { daenemark: "Dänemark", deutschland: "Deutschland", schweden: "Schweden", norwegen: "Norwegen" };
   var mySchutzzoneLayers = { daenemark: false, deutschland: false, schweden: false, norwegen: false };
   var schutzzoneLeafletLayers = {};
+  // Farben wie in den Quell-KMLs definiert (je nach Land rot/gelb = ganzjährig/saisonal,
+  // Deutschland zusätzlich gruen/orange/grau, Norwegen blau = andere Schutzkategorie).
+  var SCHUTZZONE_STYLE_COLORS = {
+    rot: "#E5362A", helaaret: "#E5362A",
+    gelb: "#E8C33A", saeson: "#E8C33A",
+    gruen: "#3FA34D",
+    orange: "#E08A2E",
+    grau: "#8A8A8A",
+    blau: "#2E8FE0", blau_punkt: "#2E8FE0"
+  };
+  function schutzzoneStyleColor(feature) {
+    var styleUrl = (feature.properties && feature.properties.styleUrl) || "";
+    var key = styleUrl.replace(/^#?style_/, "");
+    return SCHUTZZONE_STYLE_COLORS[key] || "#D9481F";
+  }
+
+  function updateSchutzzoneKmlVisibility() {
+    SCHUTZZONE_LANDS.forEach(function (land) {
+      var layer = schutzzoneLeafletLayers[land];
+      if (!layer) return;
+      var shouldShow = !!(mapTypeFilter.schutzzone && mySchutzzoneLayers[land]);
+      var onMap = map.hasLayer(layer);
+      if (shouldShow && !onMap) map.addLayer(layer);
+      else if (!shouldShow && onMap) map.removeLayer(layer);
+    });
+  }
 
   function setSchutzzoneLandVisible(land, visible, btn) {
-    if (visible) {
-      if (schutzzoneLeafletLayers[land]) return;
-      var styled = L.geoJson(null, {
-        style: function () { return { color: "#D9481F", weight: 2, fillColor: "#D9481F", fillOpacity: 0.25 }; },
-        onEachFeature: function (feature, layer) {
-          var props = feature.properties || {};
-          var title = props.name ? "<strong>" + props.name + "</strong>" : "";
-          var desc = props.description || "";
-          if (title || desc) {
-            layer.bindPopup('<div class="schutzzone-popup">' + title + (title && desc ? "<br>" : "") + desc + "</div>", { maxWidth: 280, maxHeight: 260 });
-          }
+    if (!visible) { updateSchutzzoneKmlVisibility(); return; }
+    if (schutzzoneLeafletLayers[land]) { updateSchutzzoneKmlVisibility(); return; }
+    var styled = L.geoJson(null, {
+      style: function (feature) {
+        var color = schutzzoneStyleColor(feature);
+        return { color: color, weight: 1.5, fillColor: color, fillOpacity: 0.3 };
+      },
+      onEachFeature: function (feature, layer) {
+        var props = feature.properties || {};
+        var title = props.name ? "<strong>" + props.name + "</strong>" : "";
+        var desc = props.description || "";
+        if (title || desc) {
+          layer.bindPopup('<div class="schutzzone-popup">' + title + (title && desc ? "<br>" : "") + desc + "</div>", { maxWidth: 280, maxHeight: 260 });
         }
-      });
-      if (btn) { btn.disabled = true; btn.dataset.origLabel = btn.textContent; btn.textContent = "Lädt …"; }
-      function resetBtn() {
-        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origLabel; }
+        layer.on("click", function (ev) { L.DomEvent.stopPropagation(ev); });
       }
-      var loader = omnivore.kml("schutzzonen/" + land + ".kml", null, styled);
-      loader.on("ready", resetBtn);
-      loader.on("error", function () {
-        console.warn("Schutzzonen-Daten für " + land + " konnten nicht geladen werden (Datei evtl. noch nicht vorhanden)");
-        resetBtn();
-        showToast((SCHUTZZONE_LAND_LABEL[land] || land) + ": Schutzzonen konnten nicht geladen werden");
-      });
-      loader.addTo(map);
-      schutzzoneLeafletLayers[land] = loader;
-    } else if (schutzzoneLeafletLayers[land]) {
-      map.removeLayer(schutzzoneLeafletLayers[land]);
-      delete schutzzoneLeafletLayers[land];
+    });
+    if (btn) { btn.disabled = true; btn.dataset.origLabel = btn.textContent; btn.textContent = "Lädt …"; }
+    function resetBtn() {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origLabel; }
     }
+    var loader = omnivore.kml("schutzzonen/" + land + ".kml", null, styled);
+    loader.on("ready", function () { resetBtn(); updateSchutzzoneKmlVisibility(); });
+    loader.on("error", function () {
+      console.warn("Schutzzonen-Daten für " + land + " konnten nicht geladen werden (Datei evtl. noch nicht vorhanden)");
+      resetBtn();
+      showToast((SCHUTZZONE_LAND_LABEL[land] || land) + ": Schutzzonen konnten nicht geladen werden");
+    });
+    loader.addTo(map);
+    schutzzoneLeafletLayers[land] = loader;
+    updateSchutzzoneKmlVisibility();
   }
 
   function toggleSchutzzoneLand(land, btn) {
@@ -1089,6 +1116,7 @@
     if (failed.length) {
       showToast(failed.length + " Eintrag" + (failed.length === 1 ? "" : "e") + " konnte" + (failed.length === 1 ? "" : "n") + " nicht angezeigt werden (siehe Konsole)");
     }
+    updateSchutzzoneKmlVisibility();
   }
 
   var filterPanelEl = null;
