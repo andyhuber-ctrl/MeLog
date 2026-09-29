@@ -193,7 +193,7 @@
   .card-list { display: flex; flex-direction: column; gap: 8px; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
   .card-top { display: flex; align-items: flex-start; gap: 10px; }
-  .badge { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+  .badge { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; overflow: hidden; }
   .badge.spot { background: var(--accent-wash); color: var(--accent); }
   .badge.spot.hotspot { background: var(--hotspot-wash); color: var(--hotspot); }
   .badge.spot.potspot { background: var(--potspot-wash); color: var(--potspot); }
@@ -253,7 +253,8 @@
   .pin-icon.fish.unlanded img { opacity: 0.5; filter: grayscale(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
   .pin-icon.parking-img img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
   .pin-icon.type-img img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
-  .badge-fish-img { width: 22px; height: 22px; object-fit: contain; }
+  .badge-fish-img { width: 30px; height: 30px; object-fit: contain; }
+  .badge-type-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .badge.catch.unlanded .badge-fish-img { opacity: 0.55; filter: grayscale(0.8); }
   .leaflet-popup-content-wrapper { border-radius: var(--radius); background: var(--surface); color: var(--ink); }
   .leaflet-popup-content { margin: 10px 12px; min-width: 220px; }
@@ -437,7 +438,9 @@
   var PARKING_CLASSES = ["tag", "nacht"];
   var PARKING_CLASS_LABEL = { tag: "Tagsüber", nacht: "Übernachtung möglich" };
   var PARKING_ICON_SRC = { tag: "icons/pin-parken-tag.png", nacht: "icons/pin-parken-nacht.png" };
+  var PARKING_ICON_SRC_CIRCLE = { tag: "icons/pin-parken-tag-circle.png", nacht: "icons/pin-parken-nacht-circle.png" };
   var TYPE_ICON_SRC = { einlauf: "icons/pin-einlauf.png", access: "icons/pin-zugang.png", essen: "icons/pin-essen.png", angelladen: "icons/pin-angelladen.png" };
+  var TYPE_ICON_SRC_CIRCLE = { einlauf: "icons/pin-einlauf-circle.png", access: "icons/pin-zugang-circle.png", essen: "icons/pin-essen-circle.png", angelladen: "icons/pin-angelladen-circle.png" };
   var VISIBILITY_LEVELS = ["privat", "community", "familyfriends"];
   var VISIBILITY_LABEL = { privat: "Privat", community: "Community", familyfriends: "Family&Friends" };
   var VISIBILITY_ICON = { privat: "🔒", community: "🌐", familyfriends: "👪" };
@@ -728,7 +731,12 @@
     return '' +
       '<div class="card" data-id="' + e.id + '">' +
         '<div class="card-top">' +
-          '<div class="badge ' + e.type + badgeExtra + (e.type === "catch" && e.landed === false ? " unlanded" : "") + '">' + (e.type === "catch" ? '<img class="badge-fish-img" src="' + FISH_ICON_SRC + '" alt="" />' : TYPE_ICON[e.type]) + "</div>" +
+          '<div class="badge ' + e.type + badgeExtra + (e.type === "catch" && e.landed === false ? " unlanded" : "") + '">' + (
+            e.type === "catch" ? '<img class="badge-fish-img" src="' + FISH_ICON_SRC + '" alt="" />'
+            : e.type === "parking" ? '<img class="badge-type-img" src="' + PARKING_ICON_SRC_CIRCLE[parkingClassOf(e)] + '" alt="" />'
+            : TYPE_ICON_SRC_CIRCLE[e.type] ? '<img class="badge-type-img" src="' + TYPE_ICON_SRC_CIRCLE[e.type] + '" alt="" />'
+            : TYPE_ICON[e.type]
+          ) + "</div>" +
           '<div class="card-body">' +
             '<div class="card-title-row"><div class="card-title">' + escapeHtml(e.name) + "</div>" +
               (statLine ? '<div class="card-stat mono">' + escapeHtml(statLine) + "</div>" : "") + "</div>" +
