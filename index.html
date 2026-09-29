@@ -128,6 +128,15 @@
     max-width: calc(100% - 40px); text-align: center;
   }
 
+  .admin-zone-banner {
+    position: absolute; top: 46px; left: 0; right: 0; z-index: 600;
+    background: var(--danger); color: #fff;
+    padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 0.82rem; font-weight: 600;
+  }
+  .admin-zone-banner span { flex: 1 1 auto; }
+  .admin-zone-banner .btn-secondary { padding: 5px 10px; font-size: 0.78rem; background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); color: #fff; }
+
   .map-filter-control-wrap { position: relative; }
   .leaflet-top.leaflet-right { display: flex; flex-direction: row; gap: 8px; }
   .leaflet-top.leaflet-right .leaflet-bar { border: none; box-shadow: none; background: transparent; }
@@ -392,6 +401,11 @@
       <button type="button" class="map-info-toggle" id="mapInfoToggle" aria-label="Hinweis anzeigen" title="Hinweis anzeigen">&#8505;&#65039;</button>
       <div class="map-hint" id="mapHint" hidden>Tippen zum Anlegen &middot; Ziehen zum Bewegen &middot; Pinch/Scroll zum Zoomen</div>
       <div class="map-hint" id="entriesLoadingHint" hidden>L&auml;dt Eintr&auml;ge &hellip;</div>
+      <div class="admin-zone-banner" id="adminZoneBanner" hidden>
+        <span>Schutzzonen-Bearbeitung</span>
+        <button type="button" class="btn-secondary" id="newZoneBtn">+ Neue Zone</button>
+        <button type="button" class="btn-secondary" id="exitZoneEditBtn">Beenden</button>
+      </div>
     </div>
     <div id="listPane" hidden>
       <div class="filter-row" id="listSearchRow">
@@ -930,9 +944,8 @@
   var SCHUTZZONE_LANDS = ["daenemark", "deutschland", "schweden", "norwegen"];
   var SCHUTZZONE_LAND_LABEL = { daenemark: "Dänemark", deutschland: "Deutschland", schweden: "Schweden", norwegen: "Norwegen" };
   var mySchutzzoneLayers = { daenemark: false, deutschland: false, schweden: false, norwegen: false };
-  var schutzzoneLeafletLayers = {};
-  // Farben wie in den Quell-KMLs definiert (je nach Land rot/gelb = ganzjährig/saisonal,
-  // Deutschland zusätzlich gruen/orange/grau, Norwegen blau = andere Schutzkategorie).
+  // Farben wie in den ursprünglichen KML-Quellen definiert (je nach Land rot/gelb = ganzjährig/
+  // saisonal, Deutschland zusätzlich gruen/orange/grau, Norwegen blau = andere Schutzkategorie).
   var SCHUTZZONE_STYLE_COLORS = {
     rot: "#E5362A", helaaret: "#E5362A",
     gelb: "#E8C33A", saeson: "#E8C33A",
@@ -941,67 +954,315 @@
     grau: "#8A8A8A",
     blau: "#2E8FE0", blau_punkt: "#2E8FE0"
   };
-  function schutzzoneStyleColor(feature) {
-    var styleUrl = (feature.properties && feature.properties.styleUrl) || "";
-    var key = styleUrl.replace(/^#?style_/, "");
-    return SCHUTZZONE_STYLE_COLORS[key] || "#D9481F";
-  }
-
-  function updateSchutzzoneKmlVisibility() {
-    SCHUTZZONE_LANDS.forEach(function (land) {
-      var layer = schutzzoneLeafletLayers[land];
-      if (!layer) return;
-      var shouldShow = !!(mapTypeFilter.schutzzone && mySchutzzoneLayers[land]);
-      var onMap = map.hasLayer(layer);
-      if (shouldShow && !onMap) map.addLayer(layer);
-      else if (!shouldShow && onMap) map.removeLayer(layer);
-    });
-  }
-
-  function setSchutzzoneLandVisible(land, visible, btn) {
-    if (!visible) { updateSchutzzoneKmlVisibility(); return; }
-    if (schutzzoneLeafletLayers[land]) { updateSchutzzoneKmlVisibility(); return; }
-    var styled = L.geoJson(null, {
-      style: function (feature) {
-        var color = schutzzoneStyleColor(feature);
-        return { color: color, weight: 1.5, fillColor: color, fillOpacity: 0.3 };
-      },
-      onEachFeature: function (feature, layer) {
-        var props = feature.properties || {};
-        var title = props.name ? "<strong>" + props.name + "</strong>" : "";
-        var desc = props.description || "";
-        if (title || desc) {
-          layer.bindPopup('<div class="schutzzone-popup">' + title + (title && desc ? "<br>" : "") + desc + "</div>", { maxWidth: 280, maxHeight: 260 });
-        }
-        layer.on("click", function (ev) { L.DomEvent.stopPropagation(ev); });
-      }
-    });
-    if (btn) { btn.disabled = true; btn.dataset.origLabel = btn.textContent; btn.textContent = "Lädt …"; }
-    function resetBtn() {
-      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origLabel; }
-    }
-    var loader = omnivore.kml("schutzzonen/" + land + ".kml", null, styled);
-    loader.on("ready", function () { resetBtn(); updateSchutzzoneKmlVisibility(); });
-    loader.on("error", function () {
-      console.warn("Schutzzonen-Daten für " + land + " konnten nicht geladen werden (Datei evtl. noch nicht vorhanden)");
-      resetBtn();
-      showToast((SCHUTZZONE_LAND_LABEL[land] || land) + ": Schutzzonen konnten nicht geladen werden");
-    });
-    loader.addTo(map);
-    schutzzoneLeafletLayers[land] = loader;
-    updateSchutzzoneKmlVisibility();
-  }
+  var SCHUTZZONE_STYLE_LABEL = { rot: "Rot (ganzjährig)", gelb: "Gelb (saisonal)", gruen: "Grün", orange: "Orange", grau: "Grau", blau: "Blau" };
+  var officialZones = [];
+  var adminZoneEditMode = false;
 
   function toggleSchutzzoneLand(land, btn) {
     var next = !mySchutzzoneLayers[land];
     mySchutzzoneLayers[land] = next;
     btn.setAttribute("aria-pressed", next ? "true" : "false");
-    setSchutzzoneLandVisible(land, next, btn);
+    rebuildMarkers();
     db.collection("users").doc(auth.currentUser.uid).set(
       { schutzzoneLayers: mySchutzzoneLayers, updatedAt: new Date().toISOString() },
       { merge: true }
     ).catch(function () { showToast("Einstellung konnte nicht gespeichert werden"); });
   }
+
+  function subscribeOfficialZones() {
+    db.collection("officialZones").onSnapshot(function (snap) {
+      var list = [];
+      snap.forEach(function (doc) { var d = doc.data(); d.id = doc.id; list.push(d); });
+      officialZones = list;
+      rebuildMarkers();
+    }, function (err) { console.error("Schutzzonen-Fehler", err); });
+  }
+
+  function officialZoneLayer(z) {
+    var color = SCHUTZZONE_STYLE_COLORS[z.styleKey] || "#D9481F";
+    var layer = (z.polygon && z.polygon.length >= 3)
+      ? L.polygon(z.polygon.map(function (p) { return [p.lat, p.lng]; }), { color: color, weight: 1.5, fillColor: color, fillOpacity: 0.3 })
+      : L.circleMarker([z.lat, z.lng], { radius: 7, color: color, weight: 1.5, fillColor: color, fillOpacity: 0.6 });
+    if (adminZoneEditMode) {
+      layer.on("click", function (ev) { L.DomEvent.stopPropagation(ev); openZoneEditSheet(z); });
+    } else {
+      var title = z.name ? "<strong>" + escapeHtml(z.name) + "</strong>" : "";
+      var desc = z.notes || "";
+      if (title || desc) {
+        layer.bindPopup('<div class="schutzzone-popup">' + title + (title && desc ? "<br>" : "") + desc + "</div>", { maxWidth: 280, maxHeight: 260 });
+      }
+      layer.on("click", function (ev) { L.DomEvent.stopPropagation(ev); });
+    }
+    return layer;
+  }
+
+  // ---- Admin: Schutzzonen-Bearbeitungsmodus ----
+  var creatingNewZone = false;
+  var newZonePoints = [];
+  var newZonePreviewLayer = null;
+  var newZoneVertexLayer = L.layerGroup().addTo(map);
+  var zoneEditVertexLayer = null;
+  var zoneEditPreviewLayer = null;
+  var editingZoneVertices = false;
+  var zoneVertexToolbarEl = null;
+  var zoneDrawToolbarEl = null;
+
+  function setAdminZoneEditMode(on) {
+    adminZoneEditMode = on;
+    var banner = document.getElementById("adminZoneBanner");
+    if (banner) banner.hidden = !on;
+    if (!on) { cancelNewZoneDrawing(); forceCloseZoneEditing(); }
+    rebuildMarkers();
+  }
+
+  function forceCloseZoneEditing() {
+    hideZoneEditVertices();
+    if (zoneVertexToolbarEl) { zoneVertexToolbarEl.remove(); zoneVertexToolbarEl = null; }
+    editingZoneVertices = false;
+    var backdrop = document.getElementById("zoneEditBackdrop");
+    if (backdrop) backdrop.remove();
+  }
+
+  function startNewZoneDrawing() {
+    creatingNewZone = true;
+    newZonePoints = [];
+    showZoneDrawToolbar();
+  }
+
+  function redrawNewZonePreview() {
+    if (newZonePreviewLayer) { map.removeLayer(newZonePreviewLayer); newZonePreviewLayer = null; }
+    newZoneVertexLayer.clearLayers();
+    if (!newZonePoints.length) return;
+    newZonePreviewLayer = (newZonePoints.length < 3
+      ? L.polyline(newZonePoints, { color: "#D9481F", weight: 3, dashArray: "5 6" })
+      : L.polygon(newZonePoints, { color: "#D9481F", weight: 3, dashArray: "5 6", fillOpacity: 0.18 })
+    ).addTo(map);
+    newZonePoints.forEach(function (pt) {
+      L.circleMarker(pt, { radius: 5, color: "#D9481F", weight: 2, fillColor: "#fff", fillOpacity: 1 }).addTo(newZoneVertexLayer);
+    });
+  }
+
+  function updateZoneDrawHint() {
+    if (!zoneDrawToolbarEl) return;
+    var n = newZonePoints.length;
+    document.getElementById("zoneDrawHint").textContent = n === 0
+      ? "Tippe auf die Karte, um Eckpunkte der neuen Zone zu setzen (mind. 3)."
+      : n < 3 ? n + " Punkt" + (n === 1 ? "" : "e") + " gesetzt – mind. 3 nötig."
+      : n + " Punkte gesetzt.";
+    document.getElementById("zoneDrawUndoBtn").disabled = n === 0;
+    document.getElementById("zoneDrawDoneBtn").disabled = n < 3;
+  }
+
+  function showZoneDrawToolbar() {
+    removeZoneDrawToolbar();
+    zoneDrawToolbarEl = document.createElement("div");
+    zoneDrawToolbarEl.className = "draw-toolbar";
+    zoneDrawToolbarEl.innerHTML =
+      '<div class="draw-toolbar-hint" id="zoneDrawHint"></div>' +
+      '<div class="draw-toolbar-actions">' +
+        '<button type="button" class="btn-secondary" id="zoneDrawUndoBtn">↩️ Zurück</button>' +
+        '<button type="button" class="btn-secondary" id="zoneDrawCancelBtn">✕ Abbrechen</button>' +
+        '<button type="button" class="btn-primary" id="zoneDrawDoneBtn">✅ Fertig</button>' +
+      "</div>";
+    document.body.appendChild(zoneDrawToolbarEl);
+    document.getElementById("zoneDrawUndoBtn").addEventListener("click", function () {
+      newZonePoints.pop();
+      redrawNewZonePreview();
+      updateZoneDrawHint();
+    });
+    document.getElementById("zoneDrawCancelBtn").addEventListener("click", cancelNewZoneDrawing);
+    document.getElementById("zoneDrawDoneBtn").addEventListener("click", finishNewZoneDrawing);
+    updateZoneDrawHint();
+  }
+
+  function removeZoneDrawToolbar() {
+    if (zoneDrawToolbarEl) { zoneDrawToolbarEl.remove(); zoneDrawToolbarEl = null; }
+  }
+
+  function cancelNewZoneDrawing() {
+    creatingNewZone = false;
+    newZonePoints = [];
+    if (newZonePreviewLayer) { map.removeLayer(newZonePreviewLayer); newZonePreviewLayer = null; }
+    newZoneVertexLayer.clearLayers();
+    removeZoneDrawToolbar();
+  }
+
+  function finishNewZoneDrawing() {
+    if (newZonePoints.length < 3) return;
+    var polygon = newZonePoints.map(function (p) { return { lat: p.lat, lng: p.lng }; });
+    cancelNewZoneDrawing();
+    openZoneEditSheet({ polygon: polygon, land: "", name: "", notes: "", styleKey: "rot" });
+  }
+
+  function showZoneEditVertices(zone) {
+    hideZoneEditVertices();
+    if (!zone.polygon) return;
+    var color = SCHUTZZONE_STYLE_COLORS[zone.styleKey] || "#D9481F";
+    zoneEditPreviewLayer = L.polygon(zone.polygon.map(function (p) { return [p.lat, p.lng]; }), { color: color, weight: 3, dashArray: "5 6", fillOpacity: 0.15 }).addTo(map);
+    zoneEditVertexLayer = L.layerGroup().addTo(map);
+    zone.polygon.forEach(function (pt, idx) {
+      var marker = L.marker([pt.lat, pt.lng], {
+        draggable: true,
+        icon: L.divIcon({ className: "", html: '<div class="vertex-handle"></div>', iconSize: [18, 18], iconAnchor: [9, 9] })
+      }).addTo(zoneEditVertexLayer);
+      marker.on("drag", function (ev) {
+        var ll = ev.target.getLatLng();
+        zone.polygon[idx] = { lat: ll.lat, lng: ll.lng };
+        zoneEditPreviewLayer.setLatLngs(zone.polygon.map(function (p) { return [p.lat, p.lng]; }));
+      });
+    });
+  }
+
+  function hideZoneEditVertices() {
+    if (zoneEditVertexLayer) { map.removeLayer(zoneEditVertexLayer); zoneEditVertexLayer = null; }
+    if (zoneEditPreviewLayer) { map.removeLayer(zoneEditPreviewLayer); zoneEditPreviewLayer = null; }
+  }
+
+  function startZoneVertexEditing(zone, backdrop) {
+    editingZoneVertices = true;
+    backdrop.style.display = "none";
+    showZoneEditVertices(zone);
+    zoneVertexToolbarEl = document.createElement("div");
+    zoneVertexToolbarEl.className = "draw-toolbar";
+    zoneVertexToolbarEl.innerHTML =
+      '<div class="draw-toolbar-hint">Punkte ziehen zum Verschieben.</div>' +
+      '<div class="draw-toolbar-actions">' +
+        '<button type="button" class="btn-primary" id="zoneVertexDoneBtn">✅ Fertig</button>' +
+      "</div>";
+    document.body.appendChild(zoneVertexToolbarEl);
+    document.getElementById("zoneVertexDoneBtn").addEventListener("click", function () {
+      editingZoneVertices = false;
+      hideZoneEditVertices();
+      zoneVertexToolbarEl.remove();
+      zoneVertexToolbarEl = null;
+      backdrop.style.display = "";
+    });
+  }
+
+  function openZoneEditSheet(zone) {
+    var isNew = !zone.id;
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="zoneEditBackdrop"><div class="sheet">' +
+        "<h2>" + (isNew ? "Neue Schutzzone" : "Schutzzone bearbeiten") + "</h2>" +
+        '<div class="field"><label for="z_name">Name</label><input id="z_name" type="text" value="' + escapeHtml(zone.name || "") + '" /></div>' +
+        '<div class="field"><label for="z_land">Land</label><select id="z_land">' +
+          '<option value="">–</option>' +
+          SCHUTZZONE_LANDS.map(function (l) { return '<option value="' + l + '"' + (zone.land === l ? " selected" : "") + '>' + SCHUTZZONE_LAND_LABEL[l] + "</option>"; }).join("") +
+        "</select></div>" +
+        '<div class="field"><label for="z_style">Farbe / Kategorie</label><select id="z_style">' +
+          Object.keys(SCHUTZZONE_STYLE_LABEL).map(function (k) { return '<option value="' + k + '"' + (zone.styleKey === k ? " selected" : "") + '>' + SCHUTZZONE_STYLE_LABEL[k] + "</option>"; }).join("") +
+        "</select></div>" +
+        '<div class="field"><label for="z_notes">Details (HTML erlaubt, z.B. &lt;b&gt;, &lt;br/&gt;, &lt;a href&gt;)</label><textarea id="z_notes" rows="6">' + escapeHtml(zone.notes || "") + "</textarea></div>" +
+        '<div class="sheet-actions">' +
+          '<button type="button" class="btn-secondary" id="zoneEditCloseBtn">Abbrechen</button>' +
+          '<button type="button" class="btn-primary" id="zoneEditSaveBtn">Speichern</button>' +
+        "</div>" +
+        (isNew || !zone.polygon ? "" : '<button type="button" class="btn-secondary" id="zoneEditVerticesBtn" style="width:100%;margin-top:10px">📐 Eckpunkte bearbeiten</button>') +
+        (isNew ? "" : '<button type="button" class="btn-secondary" id="zoneEditDeleteBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">🗑️ Zone löschen</button>') +
+      "</div></div>");
+    var backdrop = document.getElementById("zoneEditBackdrop");
+    function close() { hideZoneEditVertices(); backdrop.remove(); }
+    if (!isNew && zone.polygon) {
+      document.getElementById("zoneEditVerticesBtn").addEventListener("click", function () {
+        startZoneVertexEditing(zone, backdrop);
+      });
+    }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("zoneEditCloseBtn").addEventListener("click", close);
+    document.getElementById("zoneEditSaveBtn").addEventListener("click", function () {
+      var name = document.getElementById("z_name").value.trim();
+      var land = document.getElementById("z_land").value;
+      var styleKey = document.getElementById("z_style").value;
+      var notes = document.getElementById("z_notes").value.trim();
+      if (!name || !land) { showToast("Bitte Name und Land angeben"); return; }
+      var data = {
+        name: name, land: land, styleKey: styleKey, notes: notes,
+        updatedAt: new Date().toISOString(), updatedBy: auth.currentUser.uid
+      };
+      if (zone.polygon) { data.polygon = zone.polygon; data.lat = null; data.lng = null; }
+      else { data.lat = zone.lat; data.lng = zone.lng; data.polygon = null; }
+      var btn = document.getElementById("zoneEditSaveBtn");
+      btn.disabled = true;
+      var ref = isNew ? db.collection("officialZones").doc() : db.collection("officialZones").doc(zone.id);
+      ref.set(data, { merge: true }).then(function () {
+        showToast("Gespeichert");
+        close();
+      }).catch(function () {
+        btn.disabled = false;
+        showToast("Fehler beim Speichern");
+      });
+    });
+    if (!isNew) {
+      document.getElementById("zoneEditDeleteBtn").addEventListener("click", function () {
+        if (!confirm('"' + zone.name + '" wirklich löschen?')) return;
+        db.collection("officialZones").doc(zone.id).delete().then(function () {
+          showToast("Gelöscht");
+          close();
+        }).catch(function () { showToast("Fehler beim Löschen"); });
+      });
+    }
+  }
+
+  function importKmlToFirestore(btn) {
+    btn.disabled = true;
+    btn.textContent = "Importiere …";
+    var perLand = SCHUTZZONE_LANDS.map(function (land) {
+      return new Promise(function (resolve) {
+        var collected = [];
+        var target = L.geoJson(null, {});
+        var loader = omnivore.kml("schutzzonen/" + land + ".kml", null, target);
+        loader.on("ready", function () {
+          target.eachLayer(function (layer) {
+            var f = layer.feature;
+            if (!f || !f.geometry) return;
+            var props = f.properties || {};
+            var styleKey = (props.styleUrl || "").replace(/^#?style_/, "") || "rot";
+            var doc = {
+              land: land, name: props.name || "", notes: props.description || "", styleKey: styleKey,
+              updatedAt: new Date().toISOString(), updatedBy: auth.currentUser.uid
+            };
+            if (f.geometry.type === "Point") {
+              doc.lng = f.geometry.coordinates[0]; doc.lat = f.geometry.coordinates[1]; doc.polygon = null;
+            } else if (f.geometry.type === "Polygon") {
+              doc.polygon = f.geometry.coordinates[0].map(function (c) { return { lat: c[1], lng: c[0] }; });
+              doc.lat = null; doc.lng = null;
+            } else {
+              console.warn("Unbekannter Geometrietyp beim Import übersprungen:", f.geometry.type, props.name);
+              return;
+            }
+            collected.push(doc);
+          });
+          resolve(collected);
+        });
+        loader.on("error", function () { resolve([]); });
+      });
+    });
+    Promise.all(perLand).then(function (lists) {
+      var all = [].concat.apply([], lists);
+      var batches = chunk(all, 400);
+      var written = 0;
+      var p = Promise.resolve();
+      batches.forEach(function (items) {
+        p = p.then(function () {
+          var batch = db.batch();
+          items.forEach(function (item) { batch.set(db.collection("officialZones").doc(), item); });
+          return batch.commit().then(function () {
+            written += items.length;
+            btn.textContent = written + " / " + all.length + " …";
+          });
+        });
+      });
+      return p.then(function () {
+        showToast(written + " Schutzzonen importiert");
+        btn.textContent = "Import abgeschlossen (" + written + ")";
+      });
+    }).catch(function (err) {
+      console.error("KML-Import fehlgeschlagen", err);
+      btn.disabled = false;
+      btn.textContent = "Fehler beim Import";
+    });
+  }
+
   var spotFilter = { classes: [], months: [], substrate: [], seasons: [] };
   var catchFilter = { species: [], methods: [], years: [], seasons: [], results: [] };
   var parkingFilter = { classes: [] };
@@ -1116,7 +1377,16 @@
     if (failed.length) {
       showToast(failed.length + " Eintrag" + (failed.length === 1 ? "" : "e") + " konnte" + (failed.length === 1 ? "" : "n") + " nicht angezeigt werden (siehe Konsole)");
     }
-    updateSchutzzoneKmlVisibility();
+    if (mapTypeFilter.schutzzone || adminZoneEditMode) {
+      officialZones.forEach(function (z) {
+        if (!adminZoneEditMode && !mySchutzzoneLayers[z.land]) return;
+        try {
+          officialZoneLayer(z).addTo(markerLayer);
+        } catch (err) {
+          console.error("Schutzzone konnte nicht angezeigt werden:", z.id, err);
+        }
+      });
+    }
   }
 
   var filterPanelEl = null;
@@ -1314,6 +1584,8 @@
   document.getElementById("mapInfoToggle").addEventListener("click", function () {
     document.getElementById("mapHint").hidden = !document.getElementById("mapHint").hidden;
   });
+  document.getElementById("newZoneBtn").addEventListener("click", startNewZoneDrawing);
+  document.getElementById("exitZoneEditBtn").addEventListener("click", function () { setAdminZoneEditMode(false); });
 
   function fitToAllEntries() {
     if (!state.entries.length) { map.setView([56, 11], 5); return; }
@@ -1438,6 +1710,13 @@
   });
 
   map.on("click", function (ev) {
+    if (creatingNewZone) {
+      newZonePoints.push(ev.latlng);
+      redrawNewZonePreview();
+      updateZoneDrawHint();
+      return;
+    }
+    if (adminZoneEditMode) return;
     if (drawingPolygon) {
       drawingPoints.push(ev.latlng);
       redrawDrawingPreview();
@@ -3473,7 +3752,9 @@
             '<button type="button" class="btn-secondary" id="openPendingUsersBtn" style="width:100%">📋 Neue Anmeldungen</button>' +
             '<div class="field" style="margin-top:14px"><label for="p_new_user_email">Neuen User freischalten</label>' +
               '<input id="p_new_user_email" type="email" placeholder="email@beispiel.de" /></div>' +
-            '<button type="button" class="btn-secondary" id="allowUserBtn" style="width:100%">✅ Freischalten</button>'
+            '<button type="button" class="btn-secondary" id="allowUserBtn" style="width:100%">✅ Freischalten</button>' +
+            '<button type="button" class="btn-secondary" id="editZonesBtn" style="width:100%;margin-top:14px">🗺️ Schutzzonen-Bearbeitungsmodus</button>' +
+            '<button type="button" class="btn-secondary" id="importKmlBtn" style="width:100%;margin-top:10px">📥 KML-Schutzzonen importieren (einmalig)</button>'
           : "") +
         '<div class="sheet-actions" style="margin-top:16px">' +
           '<button type="button" class="btn-secondary" id="settingsCloseBtn">Schließen</button>' +
@@ -3498,6 +3779,14 @@
     if (user.email === ADMIN_EMAIL) {
       document.getElementById("allowUserBtn").addEventListener("click", allowNewUser);
       document.getElementById("openPendingUsersBtn").addEventListener("click", function () { close(); openPendingUsersSheet(); });
+      document.getElementById("editZonesBtn").addEventListener("click", function () {
+        close();
+        document.querySelector('.tab-btn[data-tab="map"]').click();
+        setAdminZoneEditMode(true);
+      });
+      document.getElementById("importKmlBtn").addEventListener("click", function (ev) {
+        importKmlToFirestore(ev.target);
+      });
     }
     document.getElementById("settingsSaveBtn").addEventListener("click", function () {
       var btn = document.getElementById("settingsSaveBtn");
@@ -3527,7 +3816,6 @@
         var savedLayers = doc.data().schutzzoneLayers || {};
         SCHUTZZONE_LANDS.forEach(function (land) {
           mySchutzzoneLayers[land] = !!savedLayers[land];
-          setSchutzzoneLandVisible(land, mySchutzzoneLayers[land]);
         });
         return ref.update({ displayName: user.displayName || "", email: user.email || "", updatedAt: new Date().toISOString() });
       }
@@ -3554,6 +3842,7 @@
     subscribeEntries();
     subscribeConnections();
     subscribeBaitCatalog();
+    subscribeOfficialZones();
   }
   auth.onAuthStateChanged(function (user) {
     authLoadingEl.hidden = true;
