@@ -271,6 +271,8 @@
   .type-picker { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
   .type-opt { border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); padding: 7px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
   .type-opt[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .profile-filter-banner { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; background: var(--accent-wash); border-bottom: 1px solid var(--border); font-size: 0.85rem; font-weight: 600; color: var(--accent-strong); }
+  .profile-filter-banner button { background: none; border: none; font-size: 1rem; font-weight: 700; color: inherit; cursor: pointer; padding: 2px 6px; line-height: 1; }
   .type-opt[aria-pressed="true"].spot { background: var(--accent); border-color: var(--accent); color: #fff; }
   .type-opt[aria-pressed="true"].catch { background: var(--catch); border-color: var(--catch); color: #241800; }
   .type-opt[aria-pressed="true"].parking { background: var(--parking); border-color: var(--parking); color: #fff; }
@@ -356,6 +358,11 @@
     <button class="tab-btn" data-tab="spot" role="tab" aria-selected="false">Spots</button>
     <button class="tab-btn" data-tab="bait" role="tab" aria-selected="false">Köder</button>
   </nav>
+
+  <div class="profile-filter-banner" id="profileFilterBanner" hidden>
+    <span id="profileFilterLabel"></span>
+    <button type="button" id="profileFilterClearBtn" aria-label="Filter aufheben">✕</button>
+  </div>
 
   <main>
     <div id="mapPane">
@@ -484,7 +491,8 @@
     entries: [],
     tab: "map",
     search: "",
-    editingId: null
+    editingId: null,
+    profileFilterUid: null
   };
   var unsubscribeEntries = null;
   var firstSnapshotHandled = false;
@@ -744,6 +752,7 @@
       if (state.tab === "spot") { if (e.type !== "spot" && e.type !== "schutzzone") return false; }
       else if (state.tab === "bait") { if (e.type !== "catch") return false; }
       else if (e.type !== state.tab) return false;
+      if (state.profileFilterUid && e.ownerId !== state.profileFilterUid) return false;
       if (state.search) {
         var hay = [e.name, e.notes, e.method, e.bait, e.markingNote, e.wind, e.weather].join(" ").toLowerCase();
         if (hay.indexOf(state.search.toLowerCase()) === -1) return false;
@@ -840,6 +849,7 @@
   var filterSectionExpanded = { spot: false, catch: false, parking: false, einlauf: false };
 
   function entryPassesFilter(e) {
+    if (state.profileFilterUid && e.ownerId !== state.profileFilterUid) return false;
     if (!mapTypeFilter[e.type]) return false;
     if (e.type === "spot") {
       if (spotFilter.classes.length && spotFilter.classes.indexOf(spotClassOf(e)) === -1) return false;
@@ -2941,6 +2951,23 @@
       .catch(function (err) { showToast("Fehler: " + (err && err.message ? err.message : "unbekannt")); });
   }
 
+  function updateProfileFilterBanner() {
+    var banner = document.getElementById("profileFilterBanner");
+    var label = document.getElementById("profileFilterLabel");
+    if (state.profileFilterUid) {
+      label.textContent = "👤 " + otherUserLabel(state.profileFilterUid) + " – nur diese Einträge";
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+  }
+  document.getElementById("profileFilterClearBtn").addEventListener("click", function () {
+    state.profileFilterUid = null;
+    updateProfileFilterBanner();
+    rebuildMarkers();
+    renderList();
+  });
+
   function renderConnectionsDynamic() {
     var myUid = auth.currentUser.uid;
     var incoming = myConnections.filter(function (c) { return c.status === "pending" && c.requestedBy !== myUid; });
@@ -2971,6 +2998,7 @@
             '<button type="button" class="type-opt" data-tier="community" aria-pressed="' + (tier === "community") + '">🌐 Community</button>' +
             '<button type="button" class="type-opt" data-tier="familyfriends" aria-pressed="' + (tier === "familyfriends") + '">👪 Family&amp;Friends</button>' +
           "</div>" +
+          '<button type="button" class="btn-secondary" data-viewprofile="' + c.otherUid + '">Profil ansehen</button>' +
           '<button type="button" class="btn-secondary" data-remove="' + c.id + '" data-other="' + c.otherUid + '">Entfernen</button></div>';
       }).join("") : '<div class="form-hint">Noch keine bestätigten Verbindungen.</div>';
     }
@@ -2980,6 +3008,16 @@
     });
     document.querySelectorAll("#connectionsBackdrop [data-remove]").forEach(function (btn) {
       btn.onclick = function () { removeConnection(btn.getAttribute("data-remove"), btn.getAttribute("data-other")); };
+    });
+    document.querySelectorAll("#connectionsBackdrop [data-viewprofile]").forEach(function (btn) {
+      btn.onclick = function () {
+        state.profileFilterUid = btn.getAttribute("data-viewprofile");
+        updateProfileFilterBanner();
+        rebuildMarkers();
+        renderList();
+        var backdrop = document.getElementById("connectionsBackdrop");
+        if (backdrop) backdrop.remove();
+      };
     });
     document.querySelectorAll("#connectionsBackdrop .conn-tier-picker .type-opt").forEach(function (btn) {
       btn.onclick = function () {
