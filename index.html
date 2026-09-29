@@ -245,6 +245,11 @@
   .list-group-header:first-child { margin-top: 4px; }
   .list-group-count { font-weight: 500; color: var(--ink-faint); text-transform: none; letter-spacing: normal; }
 
+  .bait-section { margin-bottom: 28px; }
+  .bait-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .bait-add-row { display: flex; gap: 8px; margin-top: 12px; }
+  .bait-add-row input { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; color: var(--ink); font-size: 0.95rem; font-family: inherit; }
+
   .fab { position: fixed; right: 26px; bottom: 26px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
   .fab-secondary { position: fixed; right: 30px; bottom: 92px; z-index: 900; background: var(--surface); color: var(--ink); border: 1px solid var(--border); width: 46px; height: 46px; border-radius: 50%; font-size: 1.15rem; box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
   .fab-photo-label { position: fixed; right: 0; bottom: 112px; width: 90px; z-index: 899; pointer-events: none; }
@@ -386,7 +391,7 @@
       <div class="map-hint" id="entriesLoadingHint" hidden>L&auml;dt Eintr&auml;ge &hellip;</div>
     </div>
     <div id="listPane" hidden>
-      <div class="filter-row">
+      <div class="filter-row" id="listSearchRow">
         <input type="search" id="searchInput" placeholder="Suche nach Name, Notiz, K&ouml;der &hellip;" />
       </div>
       <div id="listRoot"></div>
@@ -791,10 +796,65 @@
       "</div>";
   }
 
+  function sortBaitList(arr) {
+    var rest = arr.filter(function (v) { return v !== "Sonstiges"; });
+    rest.sort(function (a, b) { return a.localeCompare(b, "de"); });
+    return arr.indexOf("Sonstiges") !== -1 ? rest.concat(["Sonstiges"]) : rest;
+  }
+
+  function renderBaitCatalog() {
+    function section(title, kind, list) {
+      var sorted = sortBaitList(list);
+      return '<div class="bait-section">' +
+        '<div class="list-group-header">' + title + '</div>' +
+        '<div class="bait-chips">' +
+          (sorted.length ? sorted.map(function (v) { return '<span class="tag">' + escapeHtml(v) + "</span>"; }).join("") : '<span class="form-hint">Noch keine Einträge.</span>') +
+        "</div>" +
+        '<div class="bait-add-row">' +
+          '<input type="text" class="bait-new-input" data-kind="' + kind + '" placeholder="Neuer Typ …" />' +
+          '<button type="button" class="btn-secondary bait-add-btn" data-kind="' + kind + '">Hinzufügen</button>' +
+        "</div>" +
+      "</div>";
+    }
+    listRoot.innerHTML = section("Fliegen", "flyPatterns", FLY_PATTERNS) + section("Spinnköder", "lures", LURES);
+    listRoot.querySelectorAll(".bait-add-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var kind = btn.getAttribute("data-kind");
+        var input = listRoot.querySelector('.bait-new-input[data-kind="' + kind + '"]');
+        var value = input.value.trim();
+        if (!value) return;
+        var list = kind === "flyPatterns" ? FLY_PATTERNS : LURES;
+        if (list.indexOf(value) !== -1) { showToast("Gibt es schon"); return; }
+        btn.disabled = true;
+        var update = {};
+        update[kind] = firebase.firestore.FieldValue.arrayUnion(value);
+        db.collection("config").doc("baitCatalog").set(update, { merge: true }).then(function () {
+          showToast("Hinzugefügt");
+        }).catch(function () {
+          showToast("Fehler beim Speichern");
+        }).finally(function () { btn.disabled = false; });
+      });
+    });
+  }
+
+  function subscribeBaitCatalog() {
+    db.collection("config").doc("baitCatalog").onSnapshot(function (doc) {
+      if (doc.exists) {
+        var data = doc.data();
+        if (data.flyPatterns) FLY_PATTERNS = data.flyPatterns;
+        if (data.lures) LURES = data.lures;
+      }
+      if (state.tab === "bait") renderBaitCatalog();
+    }, function (err) { console.error("Köder-Katalog-Fehler", err); });
+  }
+
   function renderList() {
+    if (state.tab === "bait") {
+      renderBaitCatalog();
+      return;
+    }
     var filtered = state.entries.filter(function (e) {
       if (state.tab === "spot") { if (e.type !== "spot" && e.type !== "schutzzone") return false; }
-      else if (state.tab === "bait") { if (e.type !== "catch") return false; }
       else if (e.type !== state.tab) return false;
       if (state.profileFilterUid && e.ownerId !== state.profileFilterUid) return false;
       if (state.search) {
@@ -807,29 +867,6 @@
       var da = a.date || a.createdAt || "", db_ = b.date || b.createdAt || "";
       return da < db_ ? 1 : da > db_ ? -1 : 0;
     });
-    if (state.tab === "bait") {
-      var groups = {}, order = [];
-      filtered.forEach(function (e) {
-        var key = e.bait || "Ohne Köder-Angabe";
-        if (!groups[key]) { groups[key] = []; order.push(key); }
-        groups[key].push(e);
-      });
-      order.sort(function (a, b) {
-        if (a === "Ohne Köder-Angabe") return 1;
-        if (b === "Ohne Köder-Angabe") return -1;
-        return a.localeCompare(b, "de");
-      });
-      listRoot.innerHTML = order.length
-        ? order.map(function (key) {
-            return '<div class="list-group-header">' + key + ' <span class="list-group-count">(' + groups[key].length + ")</span></div>" +
-              '<div class="card-list">' + groups[key].map(function (e) {
-                try { return cardHtml(e); } catch (err) { console.error("Karte konnte nicht gerendert werden:", e.id, e.name, err); return ""; }
-              }).join("") + "</div>";
-          }).join("")
-        : '<div class="empty-state">Noch keine Fänge mit Köder-Angabe.</div>';
-      hydratePhotos(listRoot);
-      return;
-    }
     listRoot.innerHTML = filtered.length
       ? '<div class="card-list">' + filtered.map(function (e) {
           try { return cardHtml(e); } catch (err) { console.error("Karte konnte nicht gerendert werden:", e.id, e.name, err); return ""; }
@@ -1446,6 +1483,7 @@
       var isMap = state.tab === "map";
       document.getElementById("mapPane").hidden = !isMap;
       document.getElementById("listPane").hidden = isMap;
+      document.getElementById("listSearchRow").hidden = state.tab === "bait";
       if (isMap) { setTimeout(function () { map.invalidateSize(); }, 50); }
       else renderList();
     });
@@ -1599,7 +1637,7 @@
     }
     wrap.hidden = false;
     label.textContent = method === "Fliegenfischen" ? "Fliegenmuster" : "Köder";
-    select.innerHTML = '<option value="">–</option>' + list.map(function (x) { return "<option>" + x + "</option>"; }).join("");
+    select.innerHTML = '<option value="">–</option>' + sortBaitList(list).map(function (x) { return "<option>" + escapeHtml(x) + "</option>"; }).join("");
     select.onchange = function () {
       otherInput.hidden = select.value !== "Sonstiges";
       if (!otherInput.hidden) otherInput.focus();
@@ -3464,6 +3502,7 @@
     upsertUserDoc(user);
     subscribeEntries();
     subscribeConnections();
+    subscribeBaitCatalog();
   }
   auth.onAuthStateChanged(function (user) {
     authLoadingEl.hidden = true;

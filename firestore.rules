@@ -38,6 +38,11 @@ service cloud.firestore {
       }
     }
 
+    match /config/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
     match /usernames/{username} {
       allow read: if isAllowedUser();
       allow create: if isAllowedUser()
