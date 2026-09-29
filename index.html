@@ -2877,77 +2877,6 @@
   });
 
   // ---- profile sheet ----
-  function migrateOwnership() {
-    var btn = document.getElementById("migrateOwnershipBtn");
-    var original = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = "Prüfe …";
-    var uid = auth.currentUser.uid;
-    db.collection("entries").get().then(function (snap) {
-      var toMigrate = [];
-      snap.forEach(function (doc) { if (!doc.data().ownerId) toMigrate.push(doc.id); });
-      if (!toMigrate.length) {
-        showToast("Alle Einträge sind bereits umgestellt");
-        btn.textContent = "Bereits umgestellt";
-        return;
-      }
-      btn.textContent = "Umstellung läuft …";
-      var visibleTo = computeVisibleTo(uid, "community");
-      var batches = chunk(toMigrate, 400);
-      var p = Promise.resolve();
-      batches.forEach(function (ids) {
-        p = p.then(function () {
-          var batch = db.batch();
-          ids.forEach(function (id) {
-            batch.update(db.collection("entries").doc(id), { ownerId: uid, visibility: "community", visibleTo: visibleTo });
-          });
-          return batch.commit();
-        });
-      });
-      return p.then(function () {
-        showToast(toMigrate.length + " Einträge umgestellt");
-        btn.textContent = "Umgestellt (" + toMigrate.length + ")";
-      });
-    }).catch(function (err) {
-      btn.disabled = false;
-      btn.textContent = original;
-      showToast("Umstellung fehlgeschlagen: " + (err && err.message ? err.message : "unbekannt"));
-    });
-  }
-
-  function migratePhotosToStorage() {
-    var btn = document.getElementById("migratePhotosBtn");
-    btn.disabled = true;
-    btn.textContent = "Prüfe …";
-    var uid = auth.currentUser.uid;
-    var toMigrate = [];
-    state.entries.forEach(function (e) {
-      if (e.ownerId === uid && e.photo && e.photo.indexOf("data:") === 0) toMigrate.push({ id: e.id, photo: e.photo });
-    });
-    if (!toMigrate.length) {
-      showToast("Keine Fotos zum Umstellen gefunden");
-      btn.disabled = false;
-      btn.textContent = "Bereits umgestellt";
-      return;
-    }
-    var done = 0;
-    btn.textContent = "0 / " + toMigrate.length + " …";
-    var p = Promise.resolve();
-    toMigrate.forEach(function (item) {
-      p = p.then(function () {
-        var path = "photos/" + uid + "/" + item.id;
-        return storage.ref(path).putString(item.photo, "data_url", { contentType: "image/jpeg" })
-          .then(function () { return db.collection("entries").doc(item.id).update({ photo: path }); })
-          .then(function () { done++; btn.textContent = done + " / " + toMigrate.length + " …"; })
-          .catch(function (err) { console.error("Foto-Migration fehlgeschlagen für", item.id, err); });
-      });
-    });
-    p.then(function () {
-      showToast(done + " von " + toMigrate.length + " Fotos umgestellt");
-      btn.disabled = false;
-      btn.textContent = "Umgestellt (" + done + ")";
-    });
-  }
 
   // ---- Verbindungen-Sheet ----
   var connectionsUsersCache = {};
@@ -3285,11 +3214,13 @@
           '<button type="button" class="btn-secondary" id="profileCloseBtn">Schließen</button>' +
           '<button type="button" class="btn-primary" id="profileSaveBtn">Speichern</button>' +
         "</div>" +
+        '<button type="button" class="btn-secondary" id="profileSignOutBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Abmelden</button>' +
       "</div></div>");
     var backdrop = document.getElementById("profileBackdrop");
     function close() { backdrop.remove(); }
     backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("profileCloseBtn").addEventListener("click", close);
+    document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
     document.getElementById("profileSaveBtn").addEventListener("click", function () {
       var newName = document.getElementById("p_name").value.trim();
       if (!newName) { showToast("Bitte einen Namen eingeben"); return; }
@@ -3332,24 +3263,23 @@
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="settingsBackdrop"><div class="sheet">' +
         '<h2>Einstellungen</h2>' +
+        '<h3>Sichtbarkeit</h3>' +
         '<div class="field"><label>Standard-Sichtbarkeit für neue Einträge</label><div class="type-picker" id="defaultVisibilityPicker">' +
           VISIBILITY_LEVELS.map(function (v) {
             return '<button type="button" class="type-opt" data-class="' + v + '" aria-pressed="' + (pendingDefaultVisibility === v) + '">' + VISIBILITY_ICON[v] + " " + VISIBILITY_LABEL[v] + "</button>";
           }).join("") +
         "</div></div>" +
-        '<div class="sheet-actions">' +
-          '<button type="button" class="btn-secondary" id="settingsCloseBtn">Schließen</button>' +
-          '<button type="button" class="btn-primary" id="settingsSaveBtn">Speichern</button>' +
-        "</div>" +
-        '<button type="button" class="btn-secondary" id="migrateOwnershipBtn" style="width:100%;margin-top:10px">🔄 Bestehende Einträge auf Vernetzung umstellen (einmalig)</button>' +
-        '<button type="button" class="btn-secondary" id="migratePhotosBtn" style="width:100%;margin-top:10px">📷 Fotos in Cloud Storage verschieben (einmalig)</button>' +
         (user.email === ADMIN_EMAIL
-          ? '<button type="button" class="btn-secondary" id="openPendingUsersBtn" style="width:100%;margin-top:10px">📋 Neue Anmeldungen</button>' +
+          ? '<h3>Nur Admin</h3>' +
+            '<button type="button" class="btn-secondary" id="openPendingUsersBtn" style="width:100%">📋 Neue Anmeldungen</button>' +
             '<div class="field" style="margin-top:14px"><label for="p_new_user_email">Neuen User freischalten</label>' +
               '<input id="p_new_user_email" type="email" placeholder="email@beispiel.de" /></div>' +
             '<button type="button" class="btn-secondary" id="allowUserBtn" style="width:100%">✅ Freischalten</button>'
           : "") +
-        '<button type="button" class="btn-secondary" id="profileSignOutBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Abmelden</button>' +
+        '<div class="sheet-actions" style="margin-top:16px">' +
+          '<button type="button" class="btn-secondary" id="settingsCloseBtn">Schließen</button>' +
+          '<button type="button" class="btn-primary" id="settingsSaveBtn">Speichern</button>' +
+        "</div>" +
       "</div></div>");
     var backdrop = document.getElementById("settingsBackdrop");
     function close() { backdrop.remove(); }
@@ -3363,13 +3293,10 @@
         });
       });
     });
-    document.getElementById("migrateOwnershipBtn").addEventListener("click", migrateOwnership);
-    document.getElementById("migratePhotosBtn").addEventListener("click", migratePhotosToStorage);
     if (user.email === ADMIN_EMAIL) {
       document.getElementById("allowUserBtn").addEventListener("click", allowNewUser);
       document.getElementById("openPendingUsersBtn").addEventListener("click", function () { close(); openPendingUsersSheet(); });
     }
-    document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
     document.getElementById("settingsSaveBtn").addEventListener("click", function () {
       var btn = document.getElementById("settingsSaveBtn");
       btn.disabled = true;
