@@ -22,7 +22,8 @@
     --parking: #5D6E80; --parking-wash: #E7ECF1;
     --access: #7A5D9E; --access-wash: #EEE7F5;
     --danger: #B0392E;
-    --hotspot: #D9481F; --hotspot-wash: #FBE4DA;
+    --hotspot: #109690; --hotspot-wash: #D9F2F0;
+    --spot: #6CC9C2; --spot-wash: #E6F7F5;
     --potspot: #3F8C4C; --potspot-wash: #DFF0DE;
     --schutzzone-ganzjaehrig: #8B3A96; --schutzzone-zeitlich: #B87BC2; --schutzzone-wash: #F1E2F3;
     --einlauf: #2B6CB0; --einlauf-wash: #DCE9F5;
@@ -41,7 +42,8 @@
       --parking: #9FB1C2; --parking-wash: #1B2530;
       --access: #C6ACE8; --access-wash: #251C33;
       --danger: #E2685C;
-      --hotspot: #F1875A; --hotspot-wash: #3D2015;
+      --hotspot: #35B8AE; --hotspot-wash: #143330;
+      --spot: #8FD9D2; --spot-wash: #1B3835;
       --potspot: #7ED18F; --potspot-wash: #173A1E;
       --schutzzone-ganzjaehrig: #D08AD9; --schutzzone-zeitlich: #E6C7EC; --schutzzone-wash: #2E1E33;
       --einlauf: #6FA8DC; --einlauf-wash: #16283A;
@@ -182,7 +184,7 @@
     color: var(--ink-faint); cursor: pointer; white-space: nowrap; text-align: left;
   }
   .map-filter-chip.active { color: #fff; border-color: transparent; }
-  .map-filter-chip.active[data-type="spot"] { background: var(--accent); }
+  .map-filter-chip.active[data-type="spot"] { background: var(--spot); }
   .map-filter-chip.active[data-type="catch"] { background: var(--catch); color: #241800; }
   .map-filter-chip.active[data-type="parking"] { background: var(--parking); }
   .map-filter-chip.active[data-type="access"] { background: var(--access); }
@@ -203,7 +205,7 @@
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
   .card-top { display: flex; align-items: flex-start; gap: 10px; }
   .badge { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; overflow: hidden; }
-  .badge.spot { background: var(--accent-wash); color: var(--accent); }
+  .badge.spot { background: var(--spot-wash); color: var(--spot); }
   .badge.spot.hotspot { background: var(--hotspot-wash); color: var(--hotspot); }
   .badge.spot.potspot { background: var(--potspot-wash); color: var(--potspot); }
   .badge.catch { background: var(--catch-wash); color: var(--catch); }
@@ -250,7 +252,7 @@
 
   .pin-icon { width: 30px; height: 30px; position: relative; }
   .pin-icon .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); }
-  .pin-icon.spot .dot { background: var(--accent); }
+  .pin-icon.spot .dot { background: var(--spot); }
   .pin-icon.spot.hotspot .dot { background: var(--hotspot); }
   .pin-icon.spot.potspot .dot { background: var(--potspot); }
   .pin-icon.access .dot { background: var(--access); }
@@ -290,6 +292,7 @@
   .type-opt[aria-pressed="true"].schutzzone { background: var(--schutzzone-ganzjaehrig); border-color: var(--schutzzone-ganzjaehrig); color: #fff; }
   .type-opt[aria-pressed="true"].einlauf { background: var(--einlauf); border-color: var(--einlauf); color: #fff; }
   .type-opt[aria-pressed="true"].hinweis { background: var(--hinweis); border-color: var(--hinweis); color: #241800; }
+  .type-opt[aria-pressed="true"].spot { background: var(--spot); border-color: var(--spot); color: #10262A; }
   .type-opt[aria-pressed="true"].essen { background: var(--essen); border-color: var(--essen); color: #fff; }
   .type-opt[aria-pressed="true"].angelladen { background: var(--angelladen); border-color: var(--angelladen); color: #fff; }
   .field { margin-bottom: 12px; }
@@ -481,6 +484,7 @@
       var sc = spotClassOf(e);
       if (sc === "hotspot") return cssVar("--hotspot");
       if (sc === "potspot") return cssVar("--potspot");
+      return cssVar("--spot");
     }
     return cssVar("--accent");
   }
@@ -1016,8 +1020,9 @@
       if (!entryPassesFilter(e)) return;
       try {
         var areaColor = colorForEntry(e) || "#0E6E7A";
+        var areaWeight = e.type === "spot" ? 1.5 : 2;
         var layer = hasPolygon(e)
-          ? L.polygon(polygonLatLngs(e), { color: areaColor, weight: 2, fillColor: areaColor, fillOpacity: 0.25 }).addTo(markerLayer)
+          ? L.polygon(polygonLatLngs(e), { color: areaColor, weight: areaWeight, fillColor: areaColor, fillOpacity: 0.25 }).addTo(markerLayer)
           : L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
         layer.bindPopup(popupHtml(e), { closeButton: true, maxWidth: 280 });
         markers[e.id] = layer;
@@ -1493,7 +1498,7 @@
     if (currentType === "spot") {
       if (currentSpotClass === "hotspot") return cssVar("--hotspot");
       if (currentSpotClass === "potspot") return cssVar("--potspot");
-      return cssVar("--accent");
+      return cssVar("--spot");
     }
     if (currentType === "catch") return cssVar("--catch");
     if (currentType === "parking") return cssVar("--parking");
