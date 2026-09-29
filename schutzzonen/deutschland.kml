@@ -5,8 +5,8 @@
   <description><![CDATA[
     Zusammengeführte Datei aus zwei Quellen unterschiedlicher Verlässlichkeit:<br/><br/>
     <b>1) Nordsee (124 Zonen) – amtliche Geodaten:</b> Zonierung der Nationalparks Wattenmeer Schleswig-Holstein und Niedersachsen (offizielle Shapefiles der Nationalparkverwaltungen).<br/><br/>
-    <b>2) Ostsee (117 Zonen) – Näherung, NICHT amtlich:</b> Schon-/Laichschonbezirke Mecklenburg-Vorpommern und Schleswig-Holstein. Da die Landesbehörden selbst keine Geodaten veröffentlichen ("Kartendarstellung in Vorbereitung"), wurden diese Flächen aus den Verordnungstexten rekonstruiert (Radius um geokodierte Mündungspunkte bzw. OSM-Umriss benannter Gewässer). 117 von 125 in der Verordnung genannten Zonen konnten so verortet werden.<br/><br/>
-    Details und Quellen je Zone siehe Placemark-Beschreibung. Stand: 2026-09-29. Gesamtzahl Zonen: 241
+    <b>2) Ostsee (130 Zonen) – Näherung, NICHT amtlich:</b> Schon-/Laichschonbezirke Mecklenburg-Vorpommern und Schleswig-Holstein. Da die Landesbehörden selbst keine Geodaten veröffentlichen ("Kartendarstellung in Vorbereitung"), wurden diese Flächen aus den Verordnungstexten rekonstruiert (Radius um geokodierte Mündungspunkte bzw. OSM-Umriss benannter Gewässer). 117 von 125 in der Verordnung genannten Zonen konnten so verortet werden.<br/><br/>
+    Details und Quellen je Zone siehe Placemark-Beschreibung. Stand: 2026-09-29. Gesamtzahl Zonen: 254
   ]]></description>
 
 <Style xmlns="http://www.opengis.net/kml/2.2" id="style_rot">
@@ -2260,6 +2260,387 @@
       <description>&lt;b&gt;Bundesland:&lt;/b&gt; Schleswig-Holstein (Nordsee, Helgoland)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig&lt;br/&gt;&lt;b&gt;Zweck:&lt;/b&gt; Hummerschutzgebiet; Ausnahme: Erwerbsfischerei mit Schleppangeln auf Makrele/Kabeljau&lt;br/&gt;&lt;b&gt;Rechtsgrundlage:&lt;/b&gt; Anlage 2 Abs. 4 KüFVO SH&lt;br/&gt;&lt;b&gt;Geometrie:&lt;/b&gt; Exakt – Eckpunkte wortgetreu aus der Verordnung übernommen (kein Geocoding nötig)</description>
       
       <Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>7.918833,54.189333,0 7.935500,54.181000,0 7.932167,54.157667,0 7.903833,54.164333,0 7.907167,54.169333,0 7.907167,54.174333,0 7.908833,54.181000,0 7.907167,54.182667,0 7.918833,54.189333,0</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Folder>
+  
+<Folder xmlns="http://www.opengis.net/kml/2.2">
+    <name>Rügen &amp; Hiddensee – Nationalpark-/Naturschutz-Sperrzonen, nicht amtlich (13 Zonen)</name>
+    <Placemark>
+      <name>Kreideküste zwischen Lohme und Sassnitz (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Nationalpark Jasmund (Kreideküste, Königsstuhl-Gebiet) – Steilküste, Betreten/Ankern/Angeln aus Schutz- und Sicherheitsgründen (Abbruchgefahr, Brutvögel) untersagt.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.6125342,54.5862625,0
+              13.6125342,54.5787018,0
+              13.6372535,54.5767119,0
+              13.6530463,54.5719357,0
+              13.6681525,54.5619836,0
+              13.6681525,54.5560112,0
+              13.6715857,54.5452587,0
+              13.6681525,54.5345033,0
+              13.6571662,54.5245421,0
+              13.6660926,54.5205569,0
+              13.6860053,54.523745,0
+              13.6901252,54.5380887,0
+              13.6914985,54.5564094,0
+              13.6887519,54.567159,0
+              13.6695258,54.5798957,0
+              13.6509864,54.587854,0
+              13.6242072,54.5922305,0
+              13.6125342,54.5862625,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Küste zwischen Binz und Sellin (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Naturschutzgebiet Granitz/Schmachter See-Küste – Ufernaher Schutzstreifen.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.6228339,54.3980228,0
+              13.6441199,54.3948248,0
+              13.6626593,54.3968236,0
+              13.6715857,54.3952246,0
+              13.6839454,54.3840298,0
+              13.6956183,54.38363,0
+              13.7024848,54.388828,0
+              13.6860053,54.4012205,0
+              13.672959,54.4076152,0
+              13.651673,54.404418,0
+              13.6235205,54.4052173,0
+              13.6228339,54.3980228,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Bereich Having (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Naturschutzgebiet Mönchgut (Having, Teil des Biosphärenreservats Südost-Rügen) – Vogelschutz.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.6084143,54.3356173,0
+              13.599488,54.3127916,0
+              13.6132209,54.3103882,0
+              13.64,54.3167971,0
+              13.6599128,54.3220035,0
+              13.6736457,54.3272093,0
+              13.6805121,54.3360176,0
+              13.6901252,54.3492266,0
+              13.6715857,54.3536286,0
+              13.6544196,54.350027,0
+              13.6297004,54.3476257,0
+              13.6248938,54.3356173,0
+              13.6084143,54.3356173,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Bereich Muglitz (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Naturschutzgebiet Mönchgut (Muglitz-Bucht) – Vogelschutz.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.5596625,54.3396205,0
+              13.5473029,54.3460248,0
+              13.5301368,54.3444238,0
+              13.5198371,54.3428228,0
+              13.521897,54.336418,0
+              13.543183,54.3400208,0
+              13.5555426,54.3356173,0
+              13.5596625,54.3396205,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Groß Zicker (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Naturschutzgebiet Mönchgut: Zicker (932 ha, seit 1990), Teil des Biosphärenreservats Südost-Rügen – Vogelschutz.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.6805121,54.3127916,0
+              13.651673,54.3071834,0
+              13.6358802,54.2939609,0
+              13.6502997,54.2835403,0
+              13.6654059,54.2835403,0
+              13.6866919,54.2791307,0
+              13.6956183,54.2855444,0
+              13.6949317,54.2899533,0
+              13.6983649,54.2967661,0
+              13.684632,54.2935602,0
+              13.6660926,54.2915564,0
+              13.6551062,54.2955639,0
+              13.6599128,54.3003724,0
+              13.675019,54.3055809,0
+              13.684632,54.3059815,0
+              13.6805121,54.3127916,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Nordperd Thiessow (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Naturschutzgebiet Nord- und Südperd (69 ha, seit 1990) – Vogelschutz, sensible Steilküste/Strand.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.717591,54.281536,0
+              13.7210242,54.2755226,0
+              13.7148444,54.2735179,0
+              13.7072913,54.2735179,0
+              13.7011115,54.2699092,0
+              13.7038581,54.2658993,0
+              13.7162177,54.2687063,0
+              13.7299506,54.2715131,0
+              13.7258307,54.2827386,0
+              13.717591,54.281536,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Insel Vilm (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Naturreservat Insel Vilm – strengstes Schutzgebiet (Betreten der Insel generell verboten), 100 m Wasserpufferzone rundum ebenfalls gesperrt.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.5370032,54.3328148,0
+              13.5267035,54.3268089,0
+              13.5267035,54.322404,0
+              13.521897,54.3171976,0
+              13.5157172,54.3175981,0
+              13.5177771,54.3099876,0
+              13.5246436,54.3083852,0
+              13.5267035,54.3127916,0
+              13.5301368,54.3171976,0
+              13.5390631,54.3204016,0
+              13.5507361,54.3228045,0
+              13.5493628,54.328811,0
+              13.5370032,54.3328148,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Udarser Wiek (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Nationalpark Vorpommersche Boddenlandschaft (Rügen) – zusätzlich Winterlager-Regelung der LALLF (siehe Liste).&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.1626488,54.5031919,0
+              13.1725365,54.4933227,0
+              13.1938568,54.4920665,0
+              13.2003456,54.4859642,0
+              13.219194,54.4861437,0
+              13.2241379,54.4823741,0
+              13.2263008,54.4726795,0
+              13.2164131,54.4667539,0
+              13.2065254,54.4690883,0
+              13.188913,54.4660356,0
+              13.1787163,54.4584925,0
+              13.1799522,54.4531037,0
+              13.1910759,54.4568759,0
+              13.1895309,54.4507683,0
+              13.1984916,54.4468159,0
+              13.2018906,54.4556185,0
+              13.2089974,54.4597497,0
+              13.2222839,54.4635213,0
+              13.2349526,54.4617254,0
+              13.2402054,54.4626234,0
+              13.2300087,54.4665743,0
+              13.2392784,54.4705248,0
+              13.2504021,54.4721408,0
+              13.2704865,54.4789633,0
+              13.2575088,54.4795019,0
+              13.252565,54.4865026,0
+              13.2337166,54.4836307,0
+              13.2275368,54.4877591,0
+              13.2340256,54.5112649,0
+              13.2229019,54.510368,0
+              13.1895309,54.504986,0
+              13.1691376,54.5112649,0
+              13.1626488,54.5031919,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Libben (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Fischschonbezirk (LALLF, ganzjährig) – deckt sich mit Nationalpark-Kernzone.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.1136824,54.5844619,0
+              13.140719,54.570851,0
+              13.1515337,54.5591219,0
+              13.1547781,54.5598834,0
+              13.1593357,54.5753785,0
+              13.1576363,54.5785127,0
+              13.1537739,54.5824972,0
+              13.1499887,54.590465,0
+              13.1475941,54.5997737,0
+              13.1394831,54.5982075,0
+              13.1289001,54.5903307,0
+              13.123879,54.5842878,0
+              13.1136824,54.5844619,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Gellen (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Nationalpark Vorpommersche Boddenlandschaft (Hiddensee-Südspitze) – bedeutendes Vogelschutzgebiet.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.061328,54.4991347,0
+              13.0533114,54.4759212,0
+              13.0526935,54.4556284,0
+              13.0755588,54.4407167,0
+              13.0888282,54.445628,0
+              13.0735332,54.453892,0
+              13.0987159,54.4679908,0
+              13.1024238,54.4784047,0
+              13.0739967,54.489803,0
+              13.0736877,54.4974301,0
+              13.061328,54.4991347,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Bug (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Nationalpark Vorpommersche Boddenlandschaft (Bug-Halbinsel, NW Rügen) – Vogelschutz.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.1675435,54.5786494,0
+              13.1639129,54.5710599,0
+              13.1600505,54.5650813,0
+              13.1609388,54.5609832,0
+              13.1610933,54.5595498,0
+              13.1605226,54.5539753,0
+              13.1768991,54.5547816,0
+              13.2190763,54.5730998,0
+              13.1966744,54.5827706,0
+              13.1739637,54.5770848,0
+              13.1675435,54.5786494,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Freeseort (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Nationalpark Vorpommersche Boddenlandschaft (Freesenort, Hiddensee) – Vogelschutz.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.1238214,54.4533387,0
+              13.1200362,54.4499704,0
+              13.1132384,54.4308331,0
+              13.1133929,54.4259799,0
+              13.11965,54.4240924,0
+              13.1260615,54.4250362,0
+              13.127143,54.433529,0
+              13.1379577,54.44485,0
+              13.1238214,54.4533387,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
+    </Placemark>
+    <Placemark>
+      <name>Liebitz (Rügen/Hiddensee)</name>
+      <styleUrl>#style_rot</styleUrl>
+      <description>&lt;b&gt;Bundesland:&lt;/b&gt; Mecklenburg-Vorpommern (Ostsee, Rügen/Hiddensee)&lt;br/&gt;&lt;b&gt;Schonzeit:&lt;/b&gt; ganzjährig (Angeln verboten)&lt;br/&gt;&lt;b&gt;Zweck/Einordnung:&lt;/b&gt; Nationalpark Vorpommersche Boddenlandschaft (Liebitz, Hiddensee) – Vogelschutz.&lt;br/&gt;&lt;b&gt;Quelle:&lt;/b&gt; ruegenmagic.de (private Angler-Recherche von Axel Schuldt, keine amtliche Quelle) – Geometrie unverändert übernommen.&lt;br/&gt;&lt;b&gt;Hinweis:&lt;/b&gt; Für verbindliche, aktuelle Grenzen empfiehlt die Quelle selbst eine Rückfrage beim Landesamt für Landwirtschaft, Lebensmittelsicherheit und Fischerei M-V (LALLF), Tel. 0381-4035-0.</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              13.2197028,54.4142941,0
+              13.205721,54.3992774,0
+              13.2062617,54.3962644,0
+              13.2102014,54.3957247,0
+              13.2184669,54.3963993,0
+              13.2322942,54.4021103,0
+              13.2448083,54.4043585,0
+              13.2517606,54.4004465,0
+              13.256241,54.4055275,0
+              13.2520696,54.4084949,0
+              13.2433406,54.407281,0
+              13.2361566,54.411462,0
+              13.2322942,54.4141143,0
+              13.2207843,54.4142042,0
+              13.2197028,54.4142941,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    
     </Placemark>
   </Folder>
 

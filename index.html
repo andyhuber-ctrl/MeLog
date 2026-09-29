@@ -250,6 +250,9 @@
   .bait-add-row { display: flex; gap: 8px; margin-top: 12px; }
   .bait-add-row input { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; color: var(--ink); font-size: 0.95rem; font-family: inherit; }
 
+  .schutzzone-popup { font-size: 0.85rem; line-height: 1.4; }
+  .schutzzone-popup a { color: var(--accent); word-break: break-word; }
+
   .fab { position: fixed; right: 26px; bottom: 26px; z-index: 900; background: var(--catch); color: #241800; border: none; width: 56px; height: 56px; border-radius: 50%; font-size: 1.6rem; box-shadow: var(--shadow); cursor: pointer; }
   .fab-secondary { position: fixed; right: 30px; bottom: 92px; z-index: 900; background: var(--surface); color: var(--ink); border: 1px solid var(--border); width: 46px; height: 46px; border-radius: 50%; font-size: 1.15rem; box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
   .fab-photo-label { position: fixed; right: 0; bottom: 112px; width: 90px; z-index: 899; pointer-events: none; }
@@ -929,15 +932,30 @@
   var mySchutzzoneLayers = { daenemark: false, deutschland: false, schweden: false, norwegen: false };
   var schutzzoneLeafletLayers = {};
 
-  function setSchutzzoneLandVisible(land, visible) {
+  function setSchutzzoneLandVisible(land, visible, btn) {
     if (visible) {
       if (schutzzoneLeafletLayers[land]) return;
       var styled = L.geoJson(null, {
-        style: function () { return { color: "#D9481F", weight: 2, fillColor: "#D9481F", fillOpacity: 0.25 }; }
+        style: function () { return { color: "#D9481F", weight: 2, fillColor: "#D9481F", fillOpacity: 0.25 }; },
+        onEachFeature: function (feature, layer) {
+          var props = feature.properties || {};
+          var title = props.name ? "<strong>" + props.name + "</strong>" : "";
+          var desc = props.description || "";
+          if (title || desc) {
+            layer.bindPopup('<div class="schutzzone-popup">' + title + (title && desc ? "<br>" : "") + desc + "</div>", { maxWidth: 280, maxHeight: 260 });
+          }
+        }
       });
+      if (btn) { btn.disabled = true; btn.dataset.origLabel = btn.textContent; btn.textContent = "Lädt …"; }
+      function resetBtn() {
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origLabel; }
+      }
       var loader = omnivore.kml("schutzzonen/" + land + ".kml", null, styled);
+      loader.on("ready", resetBtn);
       loader.on("error", function () {
         console.warn("Schutzzonen-Daten für " + land + " konnten nicht geladen werden (Datei evtl. noch nicht vorhanden)");
+        resetBtn();
+        showToast((SCHUTZZONE_LAND_LABEL[land] || land) + ": Schutzzonen konnten nicht geladen werden");
       });
       loader.addTo(map);
       schutzzoneLeafletLayers[land] = loader;
@@ -951,7 +969,7 @@
     var next = !mySchutzzoneLayers[land];
     mySchutzzoneLayers[land] = next;
     btn.setAttribute("aria-pressed", next ? "true" : "false");
-    setSchutzzoneLandVisible(land, next);
+    setSchutzzoneLandVisible(land, next, btn);
     db.collection("users").doc(auth.currentUser.uid).set(
       { schutzzoneLayers: mySchutzzoneLayers, updatedAt: new Date().toISOString() },
       { merge: true }
@@ -3415,7 +3433,12 @@
             return '<button type="button" class="type-opt" data-land="' + land + '" aria-pressed="' + (mySchutzzoneLayers[land] ? "true" : "false") + '">' + SCHUTZZONE_LAND_LABEL[land] + "</button>";
           }).join("") +
         "</div>" +
-        '<div class="form-hint" style="margin-top:10px"><strong>Quelle &amp; Stand:</strong> wird ergänzt</div>' +
+        '<div class="form-hint" style="margin-top:10px"><strong>Quelle &amp; Stand:</strong><br>' +
+          "Dänemark: Fiskeristyrelsen (dän. Fischereibehörde), amtlicher Geodatendienst · Stand 29.09.2026<br>" +
+          "Deutschland: Nordsee amtlich (Nationalparkverwaltungen Wattenmeer); Ostsee aus Verordnungstexten rekonstruiert und NICHT amtlich · Stand 29.09.2026<br>" +
+          "Schweden: Länsstyrelserna / Havs- och vattenmyndigheten (Svenska Fiskeregler 2.0), amtlicher Geodatendienst · Stand 29.09.2026<br>" +
+          "Norwegen: Fiskeridirektoratet / Miljødirektoratet, amtliche Datensätze (Elveutløp, Laksefjorder, Laksevassdrag) · Stand 29.09.2026" +
+        "</div>" +
         '<div class="form-hint" style="margin-top:6px; color:var(--danger)">Diese Schutzzonen dienen nur als unverbindliche Orientierungshilfe. Für die Einhaltung geltender Schutzzeiten und -zonen ist jeder Angler eigenverantwortlich zuständig. Für die Richtigkeit, Vollständigkeit und Aktualität der eingezeichneten Grenzen wird keine Gewähr übernommen – bitte zusätzlich die amtlichen Quellen vor Ort prüfen.</div>' +
         (user.email === ADMIN_EMAIL
           ? '<h3>Nur Admin</h3>' +
