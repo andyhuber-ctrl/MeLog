@@ -21,12 +21,31 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isAllowedUser();
-      allow write: if isAllowedUser() && request.auth.uid == uid
-        && request.resource.data.email == request.auth.token.email;
+
+      allow create: if isAllowedUser() && request.auth.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string
+        && request.resource.data.username is string;
+
+      allow update: if isAllowedUser() && request.auth.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && (resource.data.get('username', null) == null
+            ? request.resource.data.username is string
+            : request.resource.data.username == resource.data.username);
 
       match /private/{docId} {
         allow read, write: if isAllowedUser() && request.auth.uid == uid;
       }
+    }
+
+    match /usernames/{username} {
+      allow read: if isAllowedUser();
+      allow create: if isAllowedUser()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid'])
+        && username == username.lower()
+        && username.matches('^[a-z0-9_]{3,20}$');
+      allow update, delete: if false;
     }
 
     match /connections/{connId} {
