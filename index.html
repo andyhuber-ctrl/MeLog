@@ -83,7 +83,11 @@
   .topbar-title { display: flex; flex-direction: column; justify-self: start; min-width: 0; line-height: 1.2; }
   .topbar-title h1 { font-size: 1.25rem; margin: 0; color: #F3FBFA; text-shadow: 0 1px 3px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5); }
   .topbar-logo { height: 44px; width: auto; display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); }
-  .profile-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; justify-self: end; }
+  .profile-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; justify-self: end; overflow: hidden; }
+  .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .profile-photo-row { display: flex; align-items: center; gap: 12px; }
+  .profile-photo-preview { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+  .profile-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
   .field input:disabled { opacity: 0.6; }
   .stats { display: flex; gap: 8px; justify-self: center; }
   .stat-chip { flex: 0 0 auto; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 4px 10px; text-align: center; }
@@ -510,6 +514,8 @@
   // ---- Vernetzung: eigene Verbindungen + Einstufungen, im Speicher gehalten ----
   var myDefaultVisibility = "privat";
   var myUsername = "";
+  var myPhotoPath = "";
+  var PROFILE_PHOTO_MAX_BYTES = 200000;
   var skipAutoUserDocCreate = false;
   var USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
   var myConnections = [];       // [{id, otherUid, status, requestedBy}]
@@ -692,6 +698,22 @@
         var wrap = img.closest(".card-photo-link");
         if (wrap) wrap.remove();
       });
+    });
+  }
+
+  function updateProfileAvatarButton() {
+    var btn = document.getElementById("profileBtn");
+    if (!btn) return;
+    if (!myPhotoPath) {
+      btn.innerHTML = "&#128100;";
+      return;
+    }
+    var img = document.createElement("img");
+    img.alt = "";
+    btn.innerHTML = "";
+    btn.appendChild(img);
+    loadPhotoBlobUrl(myPhotoPath).then(function (url) { img.src = url; }).catch(function () {
+      btn.innerHTML = "&#128100;";
     });
   }
 
@@ -3205,6 +3227,15 @@
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="profileBackdrop"><div class="sheet">' +
         '<h2>Profil</h2>' +
+        '<div class="field"><label>Profilbild</label>' +
+          '<div class="profile-photo-row">' +
+            '<div class="profile-photo-preview" id="profilePhotoPreviewWrap">' +
+              (myPhotoPath ? '<img data-photo-path="' + escapeHtml(myPhotoPath) + '" alt="" />' : "&#128100;") +
+            "</div>" +
+            '<button type="button" class="btn-secondary" id="profilePhotoBtn">📷 ' + (myPhotoPath ? "Foto ändern" : "Foto hochladen") + "</button>" +
+          "</div>" +
+          '<input type="file" id="profilePhotoInput" accept="image/*" hidden />' +
+        "</div>" +
         '<div class="field"><label for="p_name">Name</label><input id="p_name" type="text" value="' + escapeHtml(user.displayName || "") + '" /></div>' +
         '<div class="field"><label for="p_email">E-Mail</label><input id="p_email" type="text" value="' + escapeHtml(user.email || "") + '" disabled /></div>' +
         (myUsername
@@ -3217,10 +3248,40 @@
         '<button type="button" class="btn-secondary" id="profileSignOutBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Abmelden</button>' +
       "</div></div>");
     var backdrop = document.getElementById("profileBackdrop");
+    hydratePhotos(backdrop);
     function close() { backdrop.remove(); }
     backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("profileCloseBtn").addEventListener("click", close);
     document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
+    document.getElementById("profilePhotoBtn").addEventListener("click", function () {
+      document.getElementById("profilePhotoInput").click();
+    });
+    document.getElementById("profilePhotoInput").addEventListener("change", function (ev) {
+      var file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      var photoBtn = document.getElementById("profilePhotoBtn");
+      var wrap = document.getElementById("profilePhotoPreviewWrap");
+      photoBtn.disabled = true;
+      photoBtn.textContent = "Lädt hoch …";
+      compressImageToLimit(file, PROFILE_PHOTO_MAX_BYTES).then(function (dataUrl) {
+        wrap.innerHTML = '<img src="' + dataUrl + '" alt="" />';
+        var path = "profilePhotos/" + user.uid;
+        return storage.ref(path).putString(dataUrl, "data_url", { contentType: "image/jpeg" }).then(function () {
+          invalidatePhotoCache(path);
+          return db.collection("users").doc(user.uid).set({ photoPath: path, updatedAt: new Date().toISOString() }, { merge: true });
+        }).then(function () {
+          myPhotoPath = path;
+          updateProfileAvatarButton();
+          showToast("Profilbild gespeichert");
+        });
+      }).catch(function () {
+        showToast("Foto konnte nicht hochgeladen werden");
+      }).finally(function () {
+        photoBtn.disabled = false;
+        photoBtn.textContent = "📷 " + (myPhotoPath ? "Foto ändern" : "Foto hochladen");
+        ev.target.value = "";
+      });
+    });
     document.getElementById("profileSaveBtn").addEventListener("click", function () {
       var newName = document.getElementById("p_name").value.trim();
       if (!newName) { showToast("Bitte einen Namen eingeben"); return; }
@@ -3320,10 +3381,14 @@
       if (doc.exists) {
         myDefaultVisibility = doc.data().defaultVisibility || "privat";
         myUsername = doc.data().username || "";
+        myPhotoPath = doc.data().photoPath || "";
+        updateProfileAvatarButton();
         return ref.update({ displayName: user.displayName || "", email: user.email || "", updatedAt: new Date().toISOString() });
       }
       myDefaultVisibility = "privat";
       myUsername = "";
+      myPhotoPath = "";
+      updateProfileAvatarButton();
       return ref.set({ displayName: user.displayName || "", email: user.email || "", defaultVisibility: "privat", updatedAt: new Date().toISOString() });
     }).catch(function (err) { console.error("User-Profil-Fehler", err); });
   }

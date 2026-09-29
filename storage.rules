@@ -18,5 +18,16 @@ service firebase.storage {
 
       allow delete: if isAllowedUser() && request.auth.uid == ownerId;
     }
+
+    match /profilePhotos/{uid} {
+      allow read: if isAllowedUser();
+
+      allow write: if isAllowedUser()
+        && request.auth.uid == uid
+        && request.resource.size < 1 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if isAllowedUser() && request.auth.uid == uid;
+    }
   }
 }
