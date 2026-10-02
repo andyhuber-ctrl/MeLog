@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="MeLog">
+<meta name="apple-mobile-web-app-title" content="MELOG">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -35,9 +35,9 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #15171A; --surface: #1F2225; --surface-2: #191B1E;
-      --ink: #E9E6E1; --ink-soft: #A39C90; --ink-faint: #6E685F; --border: #3A3530;
-      --accent: #9C6B3E; --accent-strong: #4A3320; --accent-wash: #2A2019;
+      --bg: #10191B; --surface: #182224; --surface-2: #141D1F;
+      --ink: #E9E6E1; --ink-soft: #A39C90; --ink-faint: #6E685F; --border: #30393A;
+      --accent: #3FA0A3; --accent-strong: #0C3A3E; --accent-wash: #163436;
       --catch: #E3A63D; --catch-wash: #33270F;
       --parking: #9FB1C2; --parking-wash: #1B2530;
       --access: #C6ACE8; --access-wash: #251C33;
@@ -351,6 +351,7 @@
   .draw-toolbar-actions button:disabled { opacity: 0.5; cursor: default; }
 
   .auth-screen { position: fixed; inset: 0; z-index: 2000; background: var(--accent-strong); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #privacyBackdrop { z-index: 2100; }
   .auth-box { width: 100%; max-width: 380px; background: var(--surface); border-radius: 10px; padding: 28px 24px; box-shadow: var(--shadow); }
   .auth-box h1 { font-size: 1.5rem; margin: 0 0 4px; color: var(--ink); }
   .auth-sub { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 20px; }
@@ -366,13 +367,17 @@
 
 <div class="auth-screen" id="authScreen" hidden>
   <div class="auth-box">
-    <h1>Meerforellen&#8209;Log</h1>
+    <h1>MELOG</h1>
     <div class="auth-sub" id="authSub">Mit E-Mail anmelden</div>
     <div class="auth-error" id="authError"></div>
     <div class="field" id="authNameField" hidden><label for="auth_name">Name</label><input id="auth_name" type="text" autocomplete="name" placeholder="Wie sollen wir dich nennen?" /></div>
     <div class="field" id="authUsernameField" hidden><label for="auth_username">Username</label><input id="auth_username" type="text" autocomplete="off" placeholder="z.B. mefo_erik" /><div class="form-hint">3–20 Zeichen, nur Kleinbuchstaben, Zahlen und _ &middot; kann später nicht mehr geändert werden</div></div>
     <div class="field"><label for="auth_email">E-Mail</label><input id="auth_email" type="email" autocomplete="email" /></div>
     <div class="field"><label for="auth_pass">Passwort</label><input id="auth_pass" type="password" autocomplete="current-password" /></div>
+    <div class="field checkbox-field" id="authPrivacyField" hidden>
+      <input type="checkbox" id="auth_privacy_accept" />
+      <label for="auth_privacy_accept">Ich akzeptiere die <button type="button" id="authPrivacyLinkBtn" style="background:none;border:none;color:var(--accent);font-weight:700;cursor:pointer;padding:0;font-size:inherit;text-decoration:underline;">Datenschutzerkl&auml;rung</button>.</label>
+    </div>
     <div class="sheet-actions">
       <button type="button" class="btn-primary" id="authSubmitBtn" style="flex:1">Anmelden</button>
     </div>
@@ -3294,6 +3299,9 @@
   var authNameEl = document.getElementById("auth_name");
   var authUsernameField = document.getElementById("authUsernameField");
   var authUsernameEl = document.getElementById("auth_username");
+  var authPrivacyField = document.getElementById("authPrivacyField");
+  var authPrivacyAcceptEl = document.getElementById("auth_privacy_accept");
+  document.getElementById("authPrivacyLinkBtn").addEventListener("click", openPrivacySheet);
   var authEmailEl = document.getElementById("auth_email");
   var authPassEl = document.getElementById("auth_pass");
   var authSubmitBtn = document.getElementById("authSubmitBtn");
@@ -3313,6 +3321,8 @@
     clearAuthError();
     authNameField.hidden = mode !== "signup";
     authUsernameField.hidden = mode !== "signup";
+    authPrivacyField.hidden = mode !== "signup";
+    authPrivacyAcceptEl.checked = false;
     if (mode === "signin") {
       authSubEl.textContent = "Mit E-Mail anmelden";
       authSubmitBtn.textContent = "Anmelden";
@@ -3352,6 +3362,10 @@
       showAuthError("Username: 3–20 Zeichen, nur Kleinbuchstaben, Zahlen und _.");
       return;
     }
+    if (authMode === "signup" && !authPrivacyAcceptEl.checked) {
+      showAuthError("Bitte die Datenschutzerklärung akzeptieren.");
+      return;
+    }
     authSubmitBtn.disabled = true;
     var original = authSubmitBtn.textContent;
     authSubmitBtn.textContent = "Bitte warten …";
@@ -3376,7 +3390,8 @@
         }).then(function () {
           return db.collection("users").doc(user.uid).set({
             displayName: name, email: user.email, username: username,
-            defaultVisibility: "privat", updatedAt: new Date().toISOString()
+            defaultVisibility: "privat", updatedAt: new Date().toISOString(),
+            privacyAcceptedAt: new Date().toISOString()
           });
         }).then(function () {
           myUsername = username;
@@ -3850,7 +3865,7 @@
         "</div>" +
         '<div class="form-hint" style="margin-top:6px; color:var(--danger)">Diese Schutzzonen dienen nur als unverbindliche Orientierungshilfe. Für die Einhaltung geltender Schutzzeiten und -zonen ist jeder Angler eigenverantwortlich zuständig. Für die Richtigkeit, Vollständigkeit und Aktualität der eingezeichneten Grenzen wird keine Gewähr übernommen – bitte zusätzlich die amtlichen Quellen vor Ort prüfen.</div>' +
         '<h3>App-Info</h3>' +
-        '<div class="form-hint">MeLog – das Meerforellen-Logbuch · von Anglern für Angler.</div>' +
+        '<div class="form-hint">MELOG – das Meerforellen-Logbuch · von Anglern für Angler.</div>' +
         '<button type="button" class="btn-secondary" id="openPrivacyBtn" style="width:100%;margin-top:6px">🔒 Datenschutzerkl&auml;rung</button>' +
         (user.email === ADMIN_EMAIL
           ? '<h3>Nur Admin</h3>' +
