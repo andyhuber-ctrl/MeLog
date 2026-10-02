@@ -83,28 +83,29 @@
     display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
   }
   .topbar-title { display: flex; flex-direction: column; justify-self: start; min-width: 0; line-height: 1.2; }
-  .topbar-title h1 { font-size: 1.25rem; margin: 0; color: #F3FBFA; text-shadow: 0 1px 3px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5); }
-  .topbar-logo { height: 44px; width: auto; display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); }
+  .topbar-wordmark { display: flex; align-items: center; gap: 7px; font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; letter-spacing: 0.06em; font-size: 1.3rem; color: #F3FBFA; text-shadow: 0 1px 3px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5); }
+  .topbar-fin { width: 20px; height: 20px; flex: 0 0 auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
   .profile-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; justify-self: end; overflow: hidden; }
   .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .profile-photo-row { display: flex; align-items: center; gap: 12px; }
   .profile-photo-preview { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
   .profile-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 16px; }
+  .profile-stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+  .profile-stat .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 1rem; color: var(--ink); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-stat .lbl { font-size: 0.68rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
   .field input:disabled { opacity: 0.6; }
-  .stats { display: flex; gap: 8px; justify-self: center; }
-  .stat-chip { flex: 0 0 auto; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 4px 10px; text-align: center; }
-  .stat-chip .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 0.95rem; color: #F3FBFA; display: block; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
-  .stat-chip .lbl { font-size: 0.6rem; color: #D9C7AE; text-transform: uppercase; letter-spacing: 0.05em; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
-  .stat-chip-pb { background: rgba(255, 196, 64, 0.22); border-color: rgba(255, 196, 64, 0.6); }
-  .stat-chip-pb .val, .stat-chip-pb .lbl { color: #FFD166; }
-  .stat-chip-pb .val { font-size: 1rem; }
+  .stats { display: flex; justify-self: center; min-width: 0; }
+  .stat-chip-pb { display: flex; align-items: center; gap: 5px; max-width: 100%; background: rgba(255,196,64,0.18); border: 1px solid rgba(255,196,64,0.55); border-radius: 999px; padding: 5px 12px; white-space: nowrap; overflow: hidden; }
+  .stat-chip-pb .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 0.72rem; color: #FFD166; text-shadow: 0 1px 2px rgba(0,0,0,0.6); overflow: hidden; text-overflow: ellipsis; }
 
-  nav.tabs { flex: 0 0 auto; display: flex; gap: 8px; background: transparent; padding: 10px 16px; border-bottom: none; }
+  nav.tabs { flex: 0 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: transparent; padding: 10px 16px; border-bottom: none; }
   .tab-btn {
     border: 1px solid rgba(255,255,255,0.2); background: rgba(21,23,26,0.42);
     -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     color: #F0ECE4; text-shadow: 0 1px 2px rgba(0,0,0,0.55);
-    padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    padding: 8px 4px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .tab-btn[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; text-shadow: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
 
@@ -112,6 +113,7 @@
   #mapPane { position: absolute; inset: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px)) 14px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
   #map { width: 100%; height: 100%; background: var(--surface-2); }
   #listPane { position: absolute; inset: 0; overflow-y: auto; padding: 12px 16px 90px; background: var(--bg); }
+  #networkPane { position: absolute; inset: 0; overflow-y: auto; padding: 12px 16px 90px; background: var(--bg); }
   [hidden] { display: none !important; }
 
   .map-info-toggle {
@@ -384,7 +386,10 @@
 <div id="app" hidden>
   <header class="topbar">
     <div class="topbar-title">
-      <img class="topbar-logo" src="icons/logo-melog.png" alt="MeLog – das Meerforellen-Logbuch">
+      <span class="topbar-wordmark">
+        <svg class="topbar-fin" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 C 9 18, 11 7, 17 3 C 15 9, 16 14, 21 15 C 15 17, 9 18, 3 18 Z" fill="var(--catch)"/></svg>
+        MELOG
+      </span>
     </div>
     <div class="stats" id="statsRow"></div>
     <button type="button" id="profileBtn" class="profile-avatar" aria-label="Profil">&#128100;</button>
@@ -395,6 +400,7 @@
     <button class="tab-btn" data-tab="catch" role="tab" aria-selected="false">F&auml;nge</button>
     <button class="tab-btn" data-tab="spot" role="tab" aria-selected="false">Spots</button>
     <button class="tab-btn" data-tab="bait" role="tab" aria-selected="false">Köder</button>
+    <button class="tab-btn" data-tab="network" role="tab" aria-selected="false">Netzwerk</button>
   </nav>
 
   <div class="profile-filter-banner" id="profileFilterBanner" hidden>
@@ -419,6 +425,13 @@
         <input type="search" id="searchInput" placeholder="Suche nach Name, Notiz, K&ouml;der &hellip;" />
       </div>
       <div id="listRoot"></div>
+    </div>
+    <div id="networkPane" hidden>
+      <div class="field"><label for="connSearchInput">Freunde finden (Name oder E-Mail)</label><input id="connSearchInput" type="text" placeholder="Suchen &hellip;" /></div>
+      <div id="connSearchResults"></div>
+      <h3>Anfragen erhalten</h3><div id="connPendingIncoming"></div>
+      <h3>Anfragen gesendet</h3><div id="connPendingOutgoing"></div>
+      <h3>Verbunden</h3><div id="connAccepted"></div>
     </div>
   </main>
 
@@ -626,22 +639,31 @@
   }
 
   function renderStats() {
-    var spots = state.entries.filter(function (e) { return e.type === "spot"; }).length;
-    var catches = state.entries.filter(function (e) { return e.type === "catch"; });
-    var landedCatches = catches.filter(function (e) { return e.landed !== false; });
+    var landedCatches = state.entries.filter(function (e) { return e.type === "catch" && e.landed !== false; });
     var pbEntry = null, pbLength = 0;
     landedCatches.forEach(function (e) {
       var len = e.lengthMaxCm || e.lengthCm || 0;
       if (len > pbLength) { pbLength = len; pbEntry = e; }
     });
     var pbText = pbEntry ? escapeHtml(pbEntry.name) + " " + pbLength + " cm" : "–";
-    var chips = [
-      { val: spots, lbl: "Spots" },
-      { val: catches.length, lbl: "Fänge" }
-    ];
-    statsRow.innerHTML = chips.map(function (c) {
-      return '<div class="stat-chip"><span class="val mono">' + c.val + '</span><span class="lbl">' + c.lbl + '</span></div>';
-    }).join("") + '<div class="stat-chip stat-chip-pb"><span class="val mono">🏆 ' + pbText + '</span><span class="lbl">Personal Best</span></div>';
+    statsRow.innerHTML = '<div class="stat-chip-pb"><span class="val mono">🏆 ' + pbText + "</span></div>";
+  }
+
+  function computeMyStats() {
+    var myUid = auth.currentUser && auth.currentUser.uid;
+    var mine = state.entries.filter(function (e) { return e.ownerId === myUid; });
+    var myLandedCatches = mine.filter(function (e) { return e.type === "catch" && e.landed !== false; });
+    var pbEntry = null, pbLength = 0;
+    myLandedCatches.forEach(function (e) {
+      var len = e.lengthMaxCm || e.lengthCm || 0;
+      if (len > pbLength) { pbLength = len; pbEntry = e; }
+    });
+    return {
+      spots: mine.filter(function (e) { return e.type === "spot"; }).length,
+      catchCount: myLandedCatches.length,
+      fishCount: myLandedCatches.reduce(function (sum, e) { return sum + (e.countFish || 1); }, 0),
+      pbText: pbEntry ? escapeHtml(pbEntry.name) + " " + pbLength + " cm" : "–"
+    };
   }
 
   function cardTags(e) {
@@ -1838,6 +1860,7 @@
       state.tab = "map";
       document.getElementById("mapPane").hidden = false;
       document.getElementById("listPane").hidden = true;
+      document.getElementById("networkPane").hidden = true;
       if (hasPolygon(entry)) map.fitBounds(L.latLngBounds(polygonLatLngs(entry)), { padding: [40, 40], maxZoom: 16 });
       else map.setView([entry.lat, entry.lng], 15);
       setTimeout(function () { if (markers[entry.id]) markers[entry.id].openPopup(); }, 300);
@@ -1864,6 +1887,7 @@
     state.tab = "map";
     document.getElementById("mapPane").hidden = false;
     document.getElementById("listPane").hidden = true;
+    document.getElementById("networkPane").hidden = true;
     map.invalidateSize();
   }
 
@@ -1873,11 +1897,17 @@
       btn.setAttribute("aria-selected", "true");
       state.tab = btn.getAttribute("data-tab");
       var isMap = state.tab === "map";
+      var isNetwork = state.tab === "network";
       document.getElementById("mapPane").hidden = !isMap;
-      document.getElementById("listPane").hidden = isMap;
+      document.getElementById("listPane").hidden = isMap || isNetwork;
+      document.getElementById("networkPane").hidden = !isNetwork;
       document.getElementById("listSearchRow").hidden = state.tab === "bait";
       if (isMap) { setTimeout(function () { map.invalidateSize(); }, 50); }
-      else renderList();
+      else if (isNetwork) {
+        renderConnectionsDynamic();
+        renderConnectionSearchResults(document.getElementById("connSearchInput").value);
+        loadConnectionsUserCache();
+      } else renderList();
     });
   });
 
@@ -3475,23 +3505,22 @@
       }).join("") : '<div class="form-hint">Noch keine bestätigten Verbindungen.</div>';
     }
 
-    document.querySelectorAll("#connectionsBackdrop [data-accept]").forEach(function (btn) {
+    document.querySelectorAll("#networkPane [data-accept]").forEach(function (btn) {
       btn.onclick = function () { acceptConnection(btn.getAttribute("data-accept")); };
     });
-    document.querySelectorAll("#connectionsBackdrop [data-remove]").forEach(function (btn) {
+    document.querySelectorAll("#networkPane [data-remove]").forEach(function (btn) {
       btn.onclick = function () { removeConnection(btn.getAttribute("data-remove"), btn.getAttribute("data-other")); };
     });
-    document.querySelectorAll("#connectionsBackdrop [data-viewprofile]").forEach(function (btn) {
+    document.querySelectorAll("#networkPane [data-viewprofile]").forEach(function (btn) {
       btn.onclick = function () {
         state.profileFilterUid = btn.getAttribute("data-viewprofile");
         updateProfileFilterBanner();
         rebuildMarkers();
         renderList();
-        var backdrop = document.getElementById("connectionsBackdrop");
-        if (backdrop) backdrop.remove();
+        switchToMapTab();
       };
     });
-    document.querySelectorAll("#connectionsBackdrop .conn-tier-picker .type-opt").forEach(function (btn) {
+    document.querySelectorAll("#networkPane .conn-tier-picker .type-opt").forEach(function (btn) {
       btn.onclick = function () {
         var picker = btn.closest(".conn-tier-picker");
         var otherUid = picker.getAttribute("data-other");
@@ -3503,7 +3532,7 @@
   }
 
   function renderConnectionsSheetIfOpen() {
-    if (document.getElementById("connectionsBackdrop")) renderConnectionsDynamic();
+    if (state.tab === "network") renderConnectionsDynamic();
   }
 
   function renderConnectionSearchResults(query) {
@@ -3528,27 +3557,7 @@
     });
   }
 
-  function openConnectionsSheet() {
-    var user = auth.currentUser;
-    if (!user) return;
-    document.body.insertAdjacentHTML("beforeend",
-      '<div class="sheet-backdrop" id="connectionsBackdrop"><div class="sheet">' +
-        '<h2>Verbindungen</h2>' +
-        '<div class="field"><label for="connSearchInput">Freunde finden (Name oder E-Mail)</label><input id="connSearchInput" type="text" placeholder="Suchen …" /></div>' +
-        '<div id="connSearchResults"></div>' +
-        '<h3>Anfragen erhalten</h3><div id="connPendingIncoming"></div>' +
-        '<h3>Anfragen gesendet</h3><div id="connPendingOutgoing"></div>' +
-        '<h3>Verbunden</h3><div id="connAccepted"></div>' +
-        '<div class="sheet-actions">' +
-          '<button type="button" class="btn-secondary" id="connectionsCloseBtn">Schließen</button>' +
-        "</div>" +
-      "</div></div>");
-    var backdrop = document.getElementById("connectionsBackdrop");
-    function close() { backdrop.remove(); }
-    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
-    document.getElementById("connectionsCloseBtn").addEventListener("click", close);
-    document.getElementById("connSearchInput").addEventListener("input", function (ev) { renderConnectionSearchResults(ev.target.value); });
-    renderConnectionsDynamic();
+  function loadConnectionsUserCache() {
     db.collection("users").get().then(function (snap) {
       var cache = {};
       snap.forEach(function (doc) { cache[doc.id] = doc.data(); });
@@ -3557,6 +3566,7 @@
       renderConnectionSearchResults(document.getElementById("connSearchInput").value);
     }).catch(function (err) { console.error("Nutzerliste-Fehler", err); });
   }
+  document.getElementById("connSearchInput").addEventListener("input", function (ev) { renderConnectionSearchResults(ev.target.value); });
 
   function grantAccess(email) {
     return db.collection("allowedEmails").doc(email).set({ addedAt: new Date().toISOString(), addedBy: auth.currentUser.email });
@@ -3674,9 +3684,8 @@
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="accountHubBackdrop"><div class="sheet">' +
         '<h2>Konto</h2>' +
-        '<button type="button" class="btn-secondary" id="hubProfileBtn" style="width:100%;margin-top:4px">👤 Profil</button>' +
+        '<button type="button" class="btn-secondary" id="hubProfileBtn" style="width:100%;margin-top:4px">👤 Profil bearbeiten</button>' +
         '<button type="button" class="btn-secondary" id="hubSettingsBtn" style="width:100%;margin-top:10px">⚙️ Einstellungen</button>' +
-        '<button type="button" class="btn-secondary" id="hubConnectionsBtn" style="width:100%;margin-top:10px">🤝 Freunde/Community</button>' +
         '<div class="sheet-actions" style="margin-top:14px">' +
           '<button type="button" class="btn-secondary" id="hubCloseBtn" style="flex:1">Schließen</button>' +
         "</div>" +
@@ -3687,16 +3696,23 @@
     document.getElementById("hubCloseBtn").addEventListener("click", close);
     document.getElementById("hubProfileBtn").addEventListener("click", function () { close(); openProfileSheet(); });
     document.getElementById("hubSettingsBtn").addEventListener("click", function () { close(); openSettingsSheet(); });
-    document.getElementById("hubConnectionsBtn").addEventListener("click", function () { close(); openConnectionsSheet(); });
   }
   document.getElementById("profileBtn").addEventListener("click", openAccountHubSheet);
 
   function openProfileSheet() {
     var user = auth.currentUser;
     if (!user) return;
+    var myStats = computeMyStats();
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="profileBackdrop"><div class="sheet">' +
-        '<h2>Profil</h2>' +
+        '<h2>Profil bearbeiten</h2>' +
+        '<h3>Meine Erfolge</h3>' +
+        '<div class="profile-stats-grid">' +
+          '<div class="profile-stat"><span class="val mono">' + myStats.catchCount + '</span><span class="lbl">Fänge</span></div>' +
+          '<div class="profile-stat"><span class="val mono">' + myStats.fishCount + '</span><span class="lbl">Fische gesamt</span></div>' +
+          '<div class="profile-stat"><span class="val mono">' + myStats.spots + '</span><span class="lbl">Spots</span></div>' +
+          '<div class="profile-stat"><span class="val mono">🏆 ' + myStats.pbText + '</span><span class="lbl">Personal Best</span></div>' +
+        "</div>" +
         '<div class="field"><label>Profilbild</label>' +
           '<div class="profile-photo-row">' +
             '<div class="profile-photo-preview" id="profilePhotoPreviewWrap">' +
@@ -3711,6 +3727,15 @@
         (myUsername
           ? '<div class="field"><label for="p_username">Username</label><input id="p_username" type="text" value="@' + escapeHtml(myUsername) + '" disabled /></div>'
           : '<div class="field"><label for="p_username">Username</label><input id="p_username" type="text" placeholder="z.B. mefo_erik" /><div class="form-hint">3–20 Zeichen, nur Kleinbuchstaben, Zahlen und _ &middot; kann danach nicht mehr geändert werden</div></div>') +
+        '<div class="field">' +
+          '<button type="button" class="btn-secondary" id="pwChangeToggleBtn" style="width:100%">🔒 Passwort ändern</button>' +
+          '<div id="pwChangeForm" hidden style="margin-top:10px">' +
+            '<div class="field"><label for="p_current_pw">Aktuelles Passwort</label><input id="p_current_pw" type="password" autocomplete="current-password" /></div>' +
+            '<div class="field"><label for="p_new_pw">Neues Passwort</label><input id="p_new_pw" type="password" autocomplete="new-password" /></div>' +
+            '<div class="field"><label for="p_new_pw2">Neues Passwort best&auml;tigen</label><input id="p_new_pw2" type="password" autocomplete="new-password" /></div>' +
+            '<button type="button" class="btn-secondary" id="pwChangeSaveBtn" style="width:100%">Passwort speichern</button>' +
+          "</div>" +
+        "</div>" +
         '<div class="sheet-actions">' +
           '<button type="button" class="btn-secondary" id="profileCloseBtn">Schließen</button>' +
           '<button type="button" class="btn-primary" id="profileSaveBtn">Speichern</button>' +
@@ -3723,6 +3748,35 @@
     backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("profileCloseBtn").addEventListener("click", close);
     document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
+    document.getElementById("pwChangeToggleBtn").addEventListener("click", function () {
+      document.getElementById("pwChangeForm").hidden = !document.getElementById("pwChangeForm").hidden;
+    });
+    document.getElementById("pwChangeSaveBtn").addEventListener("click", function () {
+      var currentPw = document.getElementById("p_current_pw").value;
+      var newPw = document.getElementById("p_new_pw").value;
+      var newPw2 = document.getElementById("p_new_pw2").value;
+      if (!currentPw || !newPw) { showToast("Bitte beide Passwortfelder ausfüllen"); return; }
+      if (newPw.length < 6) { showToast("Neues Passwort: mindestens 6 Zeichen"); return; }
+      if (newPw !== newPw2) { showToast("Neue Passwörter stimmen nicht überein"); return; }
+      var btn = document.getElementById("pwChangeSaveBtn");
+      btn.disabled = true;
+      btn.textContent = "Speichert …";
+      var cred = firebase.auth.EmailAuthProvider.credential(user.email, currentPw);
+      user.reauthenticateWithCredential(cred).then(function () {
+        return user.updatePassword(newPw);
+      }).then(function () {
+        showToast("Passwort geändert");
+        document.getElementById("p_current_pw").value = "";
+        document.getElementById("p_new_pw").value = "";
+        document.getElementById("p_new_pw2").value = "";
+        document.getElementById("pwChangeForm").hidden = true;
+      }).catch(function (err) {
+        showToast(err && err.code === "auth/wrong-password" ? "Aktuelles Passwort ist falsch" : "Fehler: " + (err && err.message ? err.message : "unbekannt"));
+      }).finally(function () {
+        btn.disabled = false;
+        btn.textContent = "Passwort speichern";
+      });
+    });
     document.getElementById("profilePhotoBtn").addEventListener("click", function () {
       document.getElementById("profilePhotoInput").click();
     });
@@ -3814,6 +3868,9 @@
           "Norwegen: Fiskeridirektoratet / Miljødirektoratet, amtliche Datensätze (Elveutløp, Laksefjorder, Laksevassdrag) · Stand 29.09.2026" +
         "</div>" +
         '<div class="form-hint" style="margin-top:6px; color:var(--danger)">Diese Schutzzonen dienen nur als unverbindliche Orientierungshilfe. Für die Einhaltung geltender Schutzzeiten und -zonen ist jeder Angler eigenverantwortlich zuständig. Für die Richtigkeit, Vollständigkeit und Aktualität der eingezeichneten Grenzen wird keine Gewähr übernommen – bitte zusätzlich die amtlichen Quellen vor Ort prüfen.</div>' +
+        '<h3>App-Info</h3>' +
+        '<div class="form-hint">MeLog – das Meerforellen-Logbuch · von Anglern für Angler.</div>' +
+        '<button type="button" class="btn-secondary" id="openPrivacyBtn" style="width:100%;margin-top:6px">🔒 Datenschutzerkl&auml;rung</button>' +
         (user.email === ADMIN_EMAIL
           ? '<h3>Nur Admin</h3>' +
             '<button type="button" class="btn-secondary" id="openPendingUsersBtn" style="width:100%">📋 Neue Anmeldungen</button>' +
@@ -3832,6 +3889,7 @@
     function close() { backdrop.remove(); }
     backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("settingsCloseBtn").addEventListener("click", close);
+    document.getElementById("openPrivacyBtn").addEventListener("click", function () { close(); openPrivacySheet(); });
     document.querySelectorAll("#defaultVisibilityPicker .type-opt").forEach(function (btn) {
       btn.addEventListener("click", function () {
         pendingDefaultVisibility = btn.getAttribute("data-class");
@@ -3869,6 +3927,33 @@
         showToast("Fehler beim Speichern");
       });
     });
+  }
+
+  function openPrivacySheet() {
+    var sections = [
+      ["Verantwortlicher", "Andreas Huber, Kontakt: " + ADMIN_EMAIL + " (Betreiber dieser App als Privatperson, kein Unternehmen)."],
+      ["Welche Daten werden erhoben", "Konto: E-Mail-Adresse, Passwort (verschlüsselt über Firebase Authentication), Anzeigename, optionaler Username, optionales Profilbild.<br>Inhalte: von dir angelegte Fänge, Spots, Parkplätze, Zugänge, Hinweise und Schutzzonen inkl. Standortdaten (Koordinaten), Fotos und weiterer von dir eingetragener Angaben (z.&nbsp;B. Wetter, Köder, Maße, Notizen).<br>Vernetzung: welche anderen Nutzer du als \"Community\" oder \"Family&amp;Friends\" einstufst, sowie Verbindungsanfragen zwischen Nutzern.<br>Technisches: Zeitstempel von Erstellung/Änderung deiner Einträge."],
+      ["Wofür werden die Daten verwendet", "Ausschließlich zur Bereitstellung der Kernfunktion der App: Speicherung, Anzeige und – je nach deiner Sichtbarkeitseinstellung – das Teilen deiner Angel-Einträge mit anderen von dir bestätigten Nutzern."],
+      ["Weitergabe an andere Nutzer", "Ein Eintrag wird ausschließlich gemäß der von dir gewählten Sichtbarkeit (🔒 Privat / 🌐 Community / 👪 Family&amp;Friends) für andere Nutzer sichtbar – und auch dann nur für Nutzer, mit denen eine von beiden Seiten bestätigte Verbindung besteht. Als \"Privat\" eingestufte Einträge siehst ausschließlich du selbst. Eine Weitergabe an Nutzer außerhalb deiner bestätigten Verbindungen findet nicht statt."],
+      ["Externe Dienste", "Google Firebase (Authentication, Firestore-Datenbank, Storage) zur Speicherung aller App-Daten und Fotos; Auftragsverarbeiter Google Ireland Limited / Google LLC, Speicherort für Fotos innerhalb der EU (Frankfurt).<br>Open-Meteo (open-meteo.com) für den optionalen automatischen Abruf von Wetter- und Wasserdaten zu einem Eintrag: übermittelt werden dabei nur Koordinaten und Datum/Uhrzeit, keine personenbezogenen Daten.<br>Google Fonts: Schriftarten werden beim Laden der App von Google-Servern geladen.<br>Es gibt kein Tracking und keine Werbe- oder Analyse-Dienste von Drittanbietern."],
+      ["Speicherdauer", "Deine Daten bleiben gespeichert, bis du sie selbst löschst oder uns über die oben genannte Kontaktadresse um Löschung deines Kontos bittest."],
+      ["Deine Rechte", "Du hast das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung deiner Daten – wende dich dazu an die oben genannte Kontaktadresse. Einträge und Profildaten kannst du zudem jederzeit selbst in der App bearbeiten oder löschen."],
+      ["Datensicherheit", "Der Zugriff auf Daten wird serverseitig über Firestore Security Rules geprüft: Nur angemeldete, freigeschaltete Nutzer können die App nutzen, und jeder Nutzer kann grundsätzlich nur seine eigenen Einträge bearbeiten oder löschen."],
+      ["Minderjährige", "Diese App richtet sich nicht gezielt an Kinder."],
+      ["Änderungen dieser Erklärung", "Diese Datenschutzerklärung kann bei Weiterentwicklung der App angepasst werden. Stand: 02.10.2026."]
+    ];
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="privacyBackdrop"><div class="sheet">' +
+        '<h2>Datenschutzerkl&auml;rung</h2>' +
+        sections.map(function (s) { return "<h3>" + s[0] + "</h3><div class=\"form-hint\" style=\"margin-top:-2px\">" + s[1] + "</div>"; }).join("") +
+        '<div class="sheet-actions" style="margin-top:16px">' +
+          '<button type="button" class="btn-secondary" id="privacyCloseBtn" style="flex:1">Schließen</button>' +
+        "</div>" +
+      "</div></div>");
+    var backdrop = document.getElementById("privacyBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("privacyCloseBtn").addEventListener("click", close);
   }
 
   function upsertUserDoc(user) {
