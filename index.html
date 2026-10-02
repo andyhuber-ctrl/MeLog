@@ -12,6 +12,13 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   @font-face {
+    font-family: 'Big Shoulders Stencil Display';
+    font-style: normal;
+    font-weight: 600 800;
+    font-display: swap;
+    src: url('fonts/big-shoulders-stencil-display.woff2') format('woff2');
+  }
+  @font-face {
     font-family: 'Big Shoulders Display';
     font-style: normal;
     font-weight: 600 800;
@@ -79,20 +86,20 @@
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
-  h1, h2, .display { font-family: "Big Shoulders Display", system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.02em; font-weight: 700; }
+  h1, h2, .display { font-family: "Big Shoulders Stencil Display", system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.02em; font-weight: 700; }
   .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
   a { color: inherit; }
   button { font-family: inherit; }
 
   #app {
     display: flex; flex-direction: column; height: 100%;
-    background-color: var(--bg);
-    background-image: url("img/hero-angler.jpg");
-    background-size: auto 140%;
-    background-position: 55% 77%;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
+    background: var(--bg);
+    position: relative;
   }
+  .hero-band { position: absolute; top: 0; left: 0; right: 0; height: 230px; overflow: hidden; z-index: 0; }
+  .hero-band img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 70%; display: block; }
+  .hero-band-fade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 55%, var(--bg) 100%); }
+  header.topbar, nav.tabs, main { position: relative; z-index: 1; }
 
   header.topbar {
     flex: 0 0 auto; z-index: 20;
@@ -101,7 +108,7 @@
     display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
   }
   .topbar-title { display: flex; flex-direction: column; justify-self: start; min-width: 0; line-height: 1.2; }
-  .topbar-wordmark { display: block; font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; letter-spacing: 0.06em; font-size: 1.3rem; color: #F3FBFA; text-shadow: 0 1px 3px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5); }
+  .topbar-wordmark { display: block; font-family: "Big Shoulders Stencil Display", system-ui, sans-serif; font-weight: 800; letter-spacing: 0.06em; font-size: 1.3rem; color: #F3FBFA; text-shadow: 0 1px 3px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5); }
   .profile-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; justify-self: end; overflow: hidden; }
   .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .profile-photo-row { display: flex; align-items: center; gap: 12px; }
@@ -276,7 +283,7 @@
   .card-actions a, .card-actions button { font-size: 0.78rem; text-decoration: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
   .card-actions .danger { color: var(--danger); border-color: var(--danger); background: transparent; }
   .empty-state { text-align: center; padding: 40px 16px; color: var(--ink-faint); }
-  .list-group-header { font-family: "Big Shoulders Display", system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; font-size: 0.9rem; color: var(--ink-soft); margin: 18px 4px 8px; }
+  .list-group-header { font-family: "Big Shoulders Stencil Display", system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; font-size: 0.9rem; color: var(--ink-soft); margin: 18px 4px 8px; }
   .list-group-header:first-child { margin-top: 4px; }
   .list-group-count { font-weight: 500; color: var(--ink-faint); text-transform: none; letter-spacing: normal; }
 
@@ -368,24 +375,31 @@
   .draw-toolbar-actions { display: flex; gap: 8px; }
   .draw-toolbar-actions button:disabled { opacity: 0.5; cursor: default; }
 
-  .auth-screen { position: fixed; inset: 0; z-index: 2000; background: var(--accent-strong); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-screen {
+    position: fixed; inset: 0; z-index: 2000; padding: 24px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background-image: linear-gradient(180deg, rgba(8,20,22,0.35) 0%, rgba(8,20,22,0.55) 45%, rgba(6,24,26,0.92) 100%), url("img/hero-angler.jpg");
+    background-size: cover; background-position: 55% 70%; background-repeat: no-repeat;
+  }
   #privacyBackdrop { z-index: 2100; }
-  .auth-box { width: 100%; max-width: 380px; background: var(--surface); border-radius: 10px; padding: 28px 24px; box-shadow: var(--shadow); }
-  .auth-box h1 { font-size: 1.5rem; margin: 0 0 4px; color: var(--ink); }
-  .auth-sub { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 20px; }
+  .auth-logo-badge { width: 72px; height: auto; filter: drop-shadow(0 4px 14px rgba(0,0,0,0.45)); }
+  .auth-box { width: 100%; max-width: 380px; background: rgba(13,36,39,0.58); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 28px 24px; box-shadow: var(--shadow); }
+  .auth-sub { font-size: 0.85rem; color: #D8E6E4; margin-bottom: 20px; }
+  .auth-box .field label { color: #B9CBC9; }
+  .auth-box .form-hint { color: #93A8A6; }
   .auth-error { font-size: 0.82rem; color: var(--danger); background: var(--access-wash); border: 1px solid var(--danger); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; display: none; }
   .auth-error.show { display: block; }
-  .auth-mode-switch { text-align: center; font-size: 0.85rem; color: var(--ink-soft); margin-top: 14px; }
+  .auth-mode-switch { text-align: center; font-size: 0.85rem; color: #B9CBC9; margin-top: 14px; }
   .auth-mode-switch button { background: none; border: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 0; font-size: inherit; }
-  .auth-loading { position: fixed; inset: 0; z-index: 2000; background: var(--accent-strong); display: flex; align-items: center; justify-content: center; color: #fff; font-family: "Big Shoulders Display", sans-serif; text-transform: uppercase; letter-spacing: 0.06em; }
+  .auth-loading { position: fixed; inset: 0; z-index: 2000; background: var(--accent-strong); display: flex; align-items: center; justify-content: center; color: #fff; font-family: "Big Shoulders Stencil Display", sans-serif; text-transform: uppercase; letter-spacing: 0.06em; }
 </style>
 </head>
 <body>
 <div class="auth-loading" id="authLoading">L&auml;dt &hellip;</div>
 
 <div class="auth-screen" id="authScreen" hidden>
+  <img class="auth-logo-badge" src="icons/logo-melog.png" alt="MeLog">
   <div class="auth-box">
-    <h1>MELOG</h1>
     <div class="auth-sub" id="authSub">Mit E-Mail anmelden</div>
     <div class="auth-error" id="authError"></div>
     <div class="field" id="authNameField" hidden><label for="auth_name">Name</label><input id="auth_name" type="text" autocomplete="name" placeholder="Wie sollen wir dich nennen?" /></div>
@@ -406,6 +420,10 @@
 </div>
 
 <div id="app" hidden>
+  <div class="hero-band" aria-hidden="true">
+    <img src="img/hero-angler.jpg" alt="">
+    <div class="hero-band-fade"></div>
+  </div>
   <header class="topbar">
     <div class="topbar-title">
       <span class="topbar-wordmark">MELOG</span>
