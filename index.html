@@ -360,6 +360,7 @@
   .leaflet-popup-tip { background: var(--surface); }
 
   .sheet-backdrop { position: fixed; inset: 0; background: rgba(6,20,22,0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; }
+  .page-view { position: fixed; inset: 0; z-index: 1000; background: var(--bg); overflow-y: auto; padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px)); }
   .sheet { width: 100%; max-width: 520px; max-height: min(88vh, 720px); overflow-y: auto; background: var(--surface); border-radius: 10px 10px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow: var(--shadow); }
   .sheet h2 { margin: 0 0 12px; font-size: 1.2rem; }
   .sheet h3 { margin: 16px 0 8px; font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -3874,7 +3875,7 @@
     var conn = !isSelf ? myConnections.find(function (c) { return c.otherUid === uid && c.status === "accepted"; }) : null;
 
     document.body.insertAdjacentHTML("beforeend",
-      '<div class="sheet-backdrop" id="profileViewBackdrop"><div class="sheet">' +
+      '<div class="page-view" id="profileViewBackdrop">' +
         '<button type="button" class="btn-secondary" id="profileViewBackBtn" style="margin-bottom:14px">&larr; Zur&uuml;ck</button>' +
         '<div class="profile-view-header">' +
           '<div class="profile-view-photo">' + (info.photoPath ? '<img data-photo-path="' + escapeHtml(info.photoPath) + '" alt="" />' : "&#128100;") + '</div>' +
@@ -3893,12 +3894,11 @@
           : '<button type="button" class="btn-secondary" id="profileViewMapBtn" style="width:100%">&#128506;&#65039; Eintr&auml;ge auf Karte anzeigen</button>' +
             (conn ? '<button type="button" class="btn-secondary" id="profileViewRemoveBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Verbindung entfernen</button>' : "")
         ) +
-      "</div></div>");
+      "</div>");
 
     var backdrop = document.getElementById("profileViewBackdrop");
     hydratePhotos(backdrop);
     function close() { backdrop.remove(); }
-    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("profileViewBackBtn").addEventListener("click", close);
     if (isSelf) {
       document.getElementById("profileViewEditBtn").addEventListener("click", function () { close(); openProfileSheet(); });
