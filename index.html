@@ -738,6 +738,56 @@
     return e.polygon.map(function (p) { return [p.lat, p.lng]; });
   }
 
+  function pointInPolygon(point, polygon) {
+    var inside = false;
+    for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      var yi = polygon[i].lat, xi = polygon[i].lng;
+      var yj = polygon[j].lat, xj = polygon[j].lng;
+      var intersect = ((yi > point.lat) !== (yj > point.lat)) &&
+        (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function closestPointOnSegment(p, a, b) {
+    var kx = Math.cos(a.lat * Math.PI / 180);
+    var ax = a.lng * kx, ay = a.lat, bx = b.lng * kx, by = b.lat, px = p.lng * kx, py = p.lat;
+    var dx = bx - ax, dy = by - ay;
+    var lenSq = dx * dx + dy * dy;
+    var t = lenSq === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    return { lat: a.lat + t * (b.lat - a.lat), lng: a.lng + t * (b.lng - a.lng) };
+  }
+
+  function distanceToPolygonBoundaryMeters(point, polygon) {
+    var min = Infinity;
+    for (var i = 0; i < polygon.length; i++) {
+      var closest = closestPointOnSegment(point, polygon[i], polygon[(i + 1) % polygon.length]);
+      var d = L.latLng(point.lat, point.lng).distanceTo(L.latLng(closest.lat, closest.lng));
+      if (d < min) min = d;
+    }
+    return min;
+  }
+
+  function findSpotForPoint(lat, lng, maxDistanceM) {
+    var point = { lat: lat, lng: lng };
+    var nearestId = null, nearestDist = Infinity;
+    for (var i = 0; i < state.entries.length; i++) {
+      var s = state.entries[i];
+      if (s.type !== "spot") continue;
+      if (hasPolygon(s)) {
+        if (pointInPolygon(point, s.polygon)) return s.id;
+        var d = distanceToPolygonBoundaryMeters(point, s.polygon);
+        if (d < nearestDist) { nearestDist = d; nearestId = s.id; }
+      } else if (typeof s.lat === "number" && typeof s.lng === "number") {
+        var d2 = L.latLng(lat, lng).distanceTo(L.latLng(s.lat, s.lng));
+        if (d2 < nearestDist) { nearestDist = d2; nearestId = s.id; }
+      }
+    }
+    return (nearestId && nearestDist <= maxDistanceM) ? nearestId : null;
+  }
+
   function renderStats() {
     var landedCatches = state.entries.filter(function (e) { return e.type === "catch" && e.landed !== false; });
     var pbEntry = null, pbLength = 0;
@@ -1458,6 +1508,40 @@
       console.error("Länder-Nachtrag fehlgeschlagen", err);
       btn.disabled = false;
       btn.textContent = "Fehler beim Nachtragen";
+    });
+  }
+
+  function backfillCatchSpots(btn) {
+    btn.disabled = true;
+    var uid = auth.currentUser.uid;
+    var targets = state.entries.filter(function (e) {
+      return e.type === "catch" && e.ownerId === uid && typeof e.lat === "number" && typeof e.lng === "number";
+    });
+    var results = [];
+    targets.forEach(function (e) {
+      var spotId = findSpotForPoint(e.lat, e.lng, 100);
+      if (spotId && spotId !== e.spotId) results.push({ id: e.id, spotId: spotId });
+    });
+    if (!results.length) {
+      btn.textContent = "Keine Zuordnung nötig";
+      return;
+    }
+    var batches = chunk(results, 400);
+    var p = Promise.resolve();
+    batches.forEach(function (group) {
+      p = p.then(function () {
+        var batch = db.batch();
+        group.forEach(function (r) { batch.update(db.collection("entries").doc(r.id), { spotId: r.spotId }); });
+        return batch.commit();
+      });
+    });
+    p.then(function () {
+      showToast(results.length + " Fänge zugeordnet");
+      btn.textContent = "Abgeschlossen (" + results.length + ")";
+    }).catch(function (err) {
+      console.error("Fang-Zuordnung fehlgeschlagen", err);
+      btn.disabled = false;
+      btn.textContent = "Fehler bei der Zuordnung";
     });
   }
 
@@ -3506,6 +3590,7 @@
       var markedEl = document.getElementById("f_marked");
       data.marked = currentLanded && !!(markedEl && markedEl.checked);
       data.markingNote = data.marked ? (g("f_marking_note").trim() || null) : null;
+      data.spotId = findSpotForPoint(lat, lng, 100);
     }
     if (currentType === "angeltag") {
       var ga = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
@@ -4440,7 +4525,8 @@
             '<button type="button" class="btn-secondary" id="allowUserBtn" style="width:100%">✅ Freischalten</button>' +
             '<button type="button" class="btn-secondary" id="editZonesBtn" style="width:100%;margin-top:14px">🗺️ Schutzzonen-Bearbeitungsmodus</button>' +
             '<button type="button" class="btn-secondary" id="importKmlBtn" style="width:100%;margin-top:10px">📥 KML-Schutzzonen importieren (einmalig)</button>' +
-            '<button type="button" class="btn-secondary" id="backfillCountryBtn" style="width:100%;margin-top:10px">🌍 Länder für eigene Spots nachtragen (einmalig)</button>'
+            '<button type="button" class="btn-secondary" id="backfillCountryBtn" style="width:100%;margin-top:10px">🌍 Länder für eigene Spots nachtragen (einmalig)</button>' +
+            '<button type="button" class="btn-secondary" id="backfillCatchSpotsBtn" style="width:100%;margin-top:10px">🎣 Fänge automatisch Spots zuordnen (einmalig)</button>'
           : "") +
         '<div class="sheet-actions" style="margin-top:16px">' +
           '<button type="button" class="btn-secondary" id="settingsCloseBtn">Schließen</button>' +
@@ -4476,6 +4562,9 @@
       });
       document.getElementById("backfillCountryBtn").addEventListener("click", function (ev) {
         backfillSpotCountries(ev.target);
+      });
+      document.getElementById("backfillCatchSpotsBtn").addEventListener("click", function (ev) {
+        backfillCatchSpots(ev.target);
       });
     }
     document.getElementById("settingsSaveBtn").addEventListener("click", function () {
