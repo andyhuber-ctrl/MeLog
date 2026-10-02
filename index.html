@@ -1376,6 +1376,7 @@
           ? L.polygon(polygonLatLngs(e), { color: areaColor, weight: areaWeight, fillColor: areaColor, fillOpacity: 0.25 }).addTo(markerLayer)
           : L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
         layer.bindPopup(popupHtml(e), { closeButton: true, maxWidth: 280 });
+        layer.on("click dblclick", function (ev) { L.DomEvent.stopPropagation(ev); });
         markers[e.id] = layer;
       } catch (err) {
         failed.push(e);
@@ -1731,7 +1732,11 @@
       updateDrawToolbarHint();
       return;
     }
-    if (editingPolygonVertices) return;
+  });
+
+  map.doubleClickZoom.disable();
+  map.on("dblclick", function (ev) {
+    if (creatingNewZone || adminZoneEditMode || drawingPolygon || editingPolygonVertices) return;
     if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
     ghostMarker = L.circleMarker(ev.latlng, {
       radius: 10, color: "#B9781A", weight: 2, dashArray: "3 3", fillOpacity: 0
