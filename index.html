@@ -146,6 +146,12 @@
   .profile-photo-row { display: flex; align-items: center; gap: 12px; }
   .profile-photo-preview { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
   .profile-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-view-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 18px; }
+  .profile-view-photo { width: 92px; height: 92px; border-radius: 50%; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; margin-bottom: 12px; }
+  .profile-view-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-view-name { margin: 0; }
+  .profile-view-username { font-family: "JetBrains Mono", monospace; color: var(--ink-soft); font-size: 0.85rem; margin-top: 2px; }
+  .profile-view-tier { margin-top: 12px; display: inline-block; background: var(--accent-wash); border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 5px 14px; font-size: 0.8rem; font-weight: 600; }
   .profile-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 16px; }
   .profile-stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
   .profile-stat .val { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 1rem; color: var(--ink); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -735,21 +741,23 @@
     statsRow.innerHTML = '<div class="stat-chip-pb"><span class="val mono">🏆 ' + pbText + "</span></div>";
   }
 
-  function computeMyStats() {
-    var myUid = auth.currentUser && auth.currentUser.uid;
-    var mine = state.entries.filter(function (e) { return e.ownerId === myUid; });
-    var myLandedCatches = mine.filter(function (e) { return e.type === "catch" && e.landed !== false; });
+  function computeStatsFor(uid) {
+    var mine = state.entries.filter(function (e) { return e.ownerId === uid; });
+    var landedCatches = mine.filter(function (e) { return e.type === "catch" && e.landed !== false; });
     var pbEntry = null, pbLength = 0;
-    myLandedCatches.forEach(function (e) {
+    landedCatches.forEach(function (e) {
       var len = e.lengthMaxCm || e.lengthCm || 0;
       if (len > pbLength) { pbLength = len; pbEntry = e; }
     });
     return {
       spots: mine.filter(function (e) { return e.type === "spot"; }).length,
-      catchCount: myLandedCatches.length,
-      fishCount: myLandedCatches.reduce(function (sum, e) { return sum + (e.countFish || 1); }, 0),
+      catchCount: landedCatches.length,
+      fishCount: landedCatches.reduce(function (sum, e) { return sum + (e.countFish || 1); }, 0),
       pbText: pbEntry ? escapeHtml(pbEntry.name) + " " + pbLength + " cm" : "–"
     };
+  }
+  function computeMyStats() {
+    return computeStatsFor(auth.currentUser && auth.currentUser.uid);
   }
 
   function cardTags(e) {
@@ -3610,13 +3618,7 @@
       btn.onclick = function () { removeConnection(btn.getAttribute("data-remove"), btn.getAttribute("data-other")); };
     });
     document.querySelectorAll("#networkPane [data-viewprofile]").forEach(function (btn) {
-      btn.onclick = function () {
-        state.profileFilterUid = btn.getAttribute("data-viewprofile");
-        updateProfileFilterBanner();
-        rebuildMarkers();
-        renderList();
-        switchToMapTab();
-      };
+      btn.onclick = function () { openProfileViewSheet(btn.getAttribute("data-viewprofile")); };
     });
     document.querySelectorAll("#networkPane .conn-tier-picker .type-opt").forEach(function (btn) {
       btn.onclick = function () {
@@ -3794,7 +3796,7 @@
   document.getElementById("menuBtn").addEventListener("click", openNavDrawer);
   document.getElementById("navDrawerCloseBtn").addEventListener("click", closeNavDrawer);
   navDrawerBackdrop.addEventListener("click", function (ev) { if (ev.target === navDrawerBackdrop) closeNavDrawer(); });
-  document.getElementById("navDrawerProfileBtn").addEventListener("click", function () { closeNavDrawer(); openProfileSheet(); });
+  document.getElementById("navDrawerProfileBtn").addEventListener("click", function () { closeNavDrawer(); openProfileViewSheet(auth.currentUser.uid); });
   document.querySelectorAll(".nav-drawer-list [data-tab]").forEach(function (btn) {
     btn.addEventListener("click", function () {
       closeNavDrawer();
@@ -3858,6 +3860,60 @@
     function close() { backdrop.remove(); }
     backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("agbCloseBtn").addEventListener("click", close);
+  }
+
+  function openProfileViewSheet(uid) {
+    var myUid = auth.currentUser && auth.currentUser.uid;
+    if (!myUid) return;
+    var isSelf = uid === myUid;
+    var info = isSelf
+      ? { displayName: auth.currentUser.displayName || "Profil", username: myUsername, photoPath: myPhotoPath }
+      : (connectionsUsersCache[uid] || {});
+    var stats = computeStatsFor(uid);
+    var tier = !isSelf ? myTiers[uid] : null;
+    var conn = !isSelf ? myConnections.find(function (c) { return c.otherUid === uid && c.status === "accepted"; }) : null;
+
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="profileViewBackdrop"><div class="sheet">' +
+        '<button type="button" class="btn-secondary" id="profileViewBackBtn" style="margin-bottom:14px">&larr; Zur&uuml;ck</button>' +
+        '<div class="profile-view-header">' +
+          '<div class="profile-view-photo">' + (info.photoPath ? '<img data-photo-path="' + escapeHtml(info.photoPath) + '" alt="" />' : "&#128100;") + '</div>' +
+          '<h2 class="profile-view-name">' + escapeHtml(info.displayName || "Profil") + '</h2>' +
+          (info.username ? '<div class="profile-view-username">@' + escapeHtml(info.username) + '</div>' : '') +
+          (tier ? '<div class="profile-view-tier">' + VISIBILITY_ICON[tier] + ' ' + VISIBILITY_LABEL[tier] + '</div>' : '') +
+        '</div>' +
+        '<div class="profile-stats-grid">' +
+          '<div class="profile-stat"><span class="val mono">' + stats.catchCount + '</span><span class="lbl">F&auml;nge</span></div>' +
+          '<div class="profile-stat"><span class="val mono">' + stats.fishCount + '</span><span class="lbl">Fische gesamt</span></div>' +
+          '<div class="profile-stat"><span class="val mono">' + stats.spots + '</span><span class="lbl">Spots</span></div>' +
+          '<div class="profile-stat"><span class="val mono">&#127942; ' + stats.pbText + '</span><span class="lbl">Personal Best</span></div>' +
+        "</div>" +
+        (isSelf
+          ? '<button type="button" class="btn-primary" id="profileViewEditBtn" style="width:100%">Profil bearbeiten</button>'
+          : '<button type="button" class="btn-secondary" id="profileViewMapBtn" style="width:100%">&#128506;&#65039; Eintr&auml;ge auf Karte anzeigen</button>' +
+            (conn ? '<button type="button" class="btn-secondary" id="profileViewRemoveBtn" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)">Verbindung entfernen</button>' : "")
+        ) +
+      "</div></div>");
+
+    var backdrop = document.getElementById("profileViewBackdrop");
+    hydratePhotos(backdrop);
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("profileViewBackBtn").addEventListener("click", close);
+    if (isSelf) {
+      document.getElementById("profileViewEditBtn").addEventListener("click", function () { close(); openProfileSheet(); });
+    } else {
+      document.getElementById("profileViewMapBtn").addEventListener("click", function () {
+        close();
+        state.profileFilterUid = uid;
+        updateProfileFilterBanner();
+        rebuildMarkers();
+        renderList();
+        switchToMapTab();
+      });
+      var removeBtn = document.getElementById("profileViewRemoveBtn");
+      if (removeBtn) removeBtn.addEventListener("click", function () { close(); removeConnection(conn.id, uid); });
+    }
   }
 
   function openProfileSheet() {
