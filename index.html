@@ -301,6 +301,9 @@
   .badge.essen { background: var(--essen-wash); color: var(--essen); }
   .badge.angelladen { background: var(--angelladen-wash); color: var(--angelladen); }
   .badge.angeltag { background: var(--angeltag-wash); color: var(--angeltag); }
+  .badge.sheet-type-pill { width: auto; height: auto; border-radius: 999px; padding: 7px 16px; font-size: 0.92rem; font-weight: 700; margin-bottom: 14px; }
+  .type-chooser-list { display: flex; flex-direction: column; gap: 10px; }
+  .type-chooser-list button { width: 100%; text-align: left; font-size: 1rem; padding: 14px 16px; }
   .card-body { flex: 1; min-width: 0; }
   .card-title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .card-title { font-weight: 700; }
@@ -2157,18 +2160,7 @@
   function sheetTemplate() {
     return '<div class="sheet-backdrop" id="sheetBackdrop"><div class="sheet">' +
       '<h2 id="sheetTitle">Neuer Eintrag</h2>' +
-      '<div class="type-picker" id="mainTypePicker">' +
-        '<button type="button" class="type-opt spot" data-type="spot">Spot</button>' +
-        '<button type="button" class="type-opt catch" data-type="catch">Fang</button>' +
-        '<button type="button" class="type-opt parking" data-type="parking">Parken</button>' +
-        '<button type="button" class="type-opt access" data-type="access">Zugang</button>' +
-        '<button type="button" class="type-opt schutzzone" data-type="schutzzone">Schutzzone</button>' +
-        '<button type="button" class="type-opt einlauf" data-type="einlauf">Einlauf</button>' +
-        '<button type="button" class="type-opt hinweis" data-type="hinweis">Hinweis</button>' +
-        '<button type="button" class="type-opt essen" data-type="essen">Essen</button>' +
-        '<button type="button" class="type-opt angelladen" data-type="angelladen">Angelladen</button>' +
-        '<button type="button" class="type-opt angeltag" data-type="angeltag">Angeltag</button>' +
-      "</div>" +
+      '<div id="sheetTypeBadge"></div>' +
       '<div id="nameFieldContainer"></div>' +
       '<div id="geomPickerContainer"></div>' +
       '<div id="coordsSection">' +
@@ -2427,7 +2419,7 @@
   function setType(type) {
     currentType = type;
     currentGeometry = ALWAYS_POLYGON_TYPES[type] ? "polygon" : "point";
-    document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
+    document.getElementById("sheetTypeBadge").innerHTML = '<span class="badge sheet-type-pill ' + type + '">' + TYPE_ICON[type] + " " + TYPE_LABEL[type] + "</span>";
     document.getElementById("nameFieldContainer").innerHTML = (type === "catch" || type === "angeltag") ? "" : nameFieldHtml(false, null);
     var extraHtml = "";
     if (type === "spot") extraHtml = spotClassPickerHtml() + monthPickerHtml() + substratePickerHtml();
@@ -2537,9 +2529,6 @@
     positionTouchedByUser = false;
     document.getElementById("sheetTitle").textContent = entry ? "Eintrag bearbeiten" : "Neuer Eintrag";
     setType(currentType);
-    document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (btn) {
-      btn.addEventListener("click", function () { currentLanded = true; setType(btn.getAttribute("data-type")); });
-    });
     document.getElementById("visibilityPickerContainer").innerHTML = visibilityPickerHtml();
     document.querySelectorAll("#visibilityPicker .type-opt").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -3565,9 +3554,59 @@
     });
   }
 
+  function openHinweisTypeChooserSheet(lat, lng) {
+    var types = ["parking", "access", "schutzzone", "einlauf", "hinweis", "essen", "angelladen"];
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="hinweisTypeChooserBackdrop"><div class="sheet">' +
+        '<h2>Was für ein Hinweis?</h2>' +
+        '<div class="type-chooser-list">' +
+          types.map(function (t) { return '<button type="button" class="btn-secondary" data-type="' + t + '">' + TYPE_ICON[t] + " " + TYPE_LABEL[t] + "</button>"; }).join("") +
+        "</div>" +
+        '<div class="sheet-actions" style="margin-top:16px"><button type="button" class="btn-secondary" id="hinweisTypeChooserCloseBtn">Abbrechen</button></div>' +
+      "</div></div>");
+    var backdrop = document.getElementById("hinweisTypeChooserBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("hinweisTypeChooserCloseBtn").addEventListener("click", close);
+    backdrop.querySelectorAll("[data-type]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        close();
+        openSheet(null, { lat: lat, lng: lng, type: btn.getAttribute("data-type") });
+      });
+    });
+  }
+
+  function openTypeChooserSheet(lat, lng) {
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="typeChooserBackdrop"><div class="sheet">' +
+        '<h2>Was möchtest du anlegen?</h2>' +
+        '<div class="type-chooser-list">' +
+          '<button type="button" class="btn-secondary" data-type="spot">' + TYPE_ICON.spot + ' Neuer Spot</button>' +
+          '<button type="button" class="btn-secondary" data-type="catch">' + TYPE_ICON.catch + ' Fang</button>' +
+          '<button type="button" class="btn-secondary" data-type="angeltag">' + TYPE_ICON.angeltag + ' Angeltag</button>' +
+          '<button type="button" class="btn-secondary" id="typeChooserHinweisBtn">' + TYPE_ICON.hinweis + ' Hinweis</button>' +
+        "</div>" +
+        '<div class="sheet-actions" style="margin-top:16px"><button type="button" class="btn-secondary" id="typeChooserCloseBtn">Abbrechen</button></div>' +
+      "</div></div>");
+    var backdrop = document.getElementById("typeChooserBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("typeChooserCloseBtn").addEventListener("click", close);
+    backdrop.querySelectorAll("[data-type]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        close();
+        openSheet(null, { lat: lat, lng: lng, type: btn.getAttribute("data-type") });
+      });
+    });
+    document.getElementById("typeChooserHinweisBtn").addEventListener("click", function () {
+      close();
+      openHinweisTypeChooserSheet(lat, lng);
+    });
+  }
+
   document.getElementById("fabAdd").addEventListener("click", function () {
     var c = map.getCenter();
-    openSheet(null, { lat: c.lat, lng: c.lng, type: "spot" });
+    openTypeChooserSheet(c.lat, c.lng);
   });
 
   document.getElementById("fabPhotoCatch").addEventListener("click", function () {
