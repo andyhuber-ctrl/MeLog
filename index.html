@@ -3674,26 +3674,7 @@
     });
   }
 
-  function openAccountHubSheet() {
-    var user = auth.currentUser;
-    if (!user) return;
-    document.body.insertAdjacentHTML("beforeend",
-      '<div class="sheet-backdrop" id="accountHubBackdrop"><div class="sheet">' +
-        '<h2>Konto</h2>' +
-        '<button type="button" class="btn-secondary" id="hubProfileBtn" style="width:100%;margin-top:4px">👤 Profil bearbeiten</button>' +
-        '<button type="button" class="btn-secondary" id="hubSettingsBtn" style="width:100%;margin-top:10px">⚙️ Einstellungen</button>' +
-        '<div class="sheet-actions" style="margin-top:14px">' +
-          '<button type="button" class="btn-secondary" id="hubCloseBtn" style="flex:1">Schließen</button>' +
-        "</div>" +
-      "</div></div>");
-    var backdrop = document.getElementById("accountHubBackdrop");
-    function close() { backdrop.remove(); }
-    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
-    document.getElementById("hubCloseBtn").addEventListener("click", close);
-    document.getElementById("hubProfileBtn").addEventListener("click", function () { close(); openProfileSheet(); });
-    document.getElementById("hubSettingsBtn").addEventListener("click", function () { close(); openSettingsSheet(); });
-  }
-  document.getElementById("profileBtn").addEventListener("click", openAccountHubSheet);
+  document.getElementById("profileBtn").addEventListener("click", openProfileSheet);
 
   function openProfileSheet() {
     var user = auth.currentUser;
@@ -3701,7 +3682,10 @@
     var myStats = computeMyStats();
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="profileBackdrop"><div class="sheet">' +
-        '<h2>Profil bearbeiten</h2>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">' +
+          '<h2 style="margin:0">Profil bearbeiten</h2>' +
+          '<button type="button" class="btn-secondary" id="openSettingsFromProfileBtn" aria-label="Einstellungen" title="Einstellungen" style="flex:0 0 auto;padding:8px 10px">⚙️</button>' +
+        "</div>" +
         '<h3>Meine Erfolge</h3>' +
         '<div class="profile-stats-grid">' +
           '<div class="profile-stat"><span class="val mono">' + myStats.catchCount + '</span><span class="lbl">Fänge</span></div>' +
@@ -3743,6 +3727,7 @@
     function close() { backdrop.remove(); }
     backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
     document.getElementById("profileCloseBtn").addEventListener("click", close);
+    document.getElementById("openSettingsFromProfileBtn").addEventListener("click", function () { close(); openSettingsSheet(); });
     document.getElementById("profileSignOutBtn").addEventListener("click", function () { close(); auth.signOut(); });
     document.getElementById("pwChangeToggleBtn").addEventListener("click", function () {
       document.getElementById("pwChangeForm").hidden = !document.getElementById("pwChangeForm").hidden;
