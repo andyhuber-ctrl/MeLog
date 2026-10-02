@@ -818,6 +818,17 @@
     return computeStatsFor(auth.currentUser && auth.currentUser.uid);
   }
 
+  function catchesForAngeltag(angeltag) {
+    if (!angeltag.spotId || !angeltag.date) return [];
+    return state.entries.filter(function (e) {
+      if (e.type !== "catch" || e.ownerId !== angeltag.ownerId || e.spotId !== angeltag.spotId || e.date !== angeltag.date) return false;
+      if (angeltag.timeFrom && angeltag.timeTo && e.time) {
+        return e.time >= angeltag.timeFrom && e.time <= angeltag.timeTo;
+      }
+      return true;
+    });
+  }
+
   function cardTags(e) {
     var tags = [];
     if (e.visibility) tags.push(VISIBILITY_ICON[e.visibility] + " " + VISIBILITY_LABEL[e.visibility]);
@@ -936,6 +947,10 @@
       if (e.lengthMinCm && e.lengthMaxCm) statLine = e.lengthMinCm + "–" + e.lengthMaxCm + " cm";
       else if (e.lengthCm) statLine = e.lengthCm + (e.lengthApprox !== false ? "+" : "") + " cm";
       if (e.countFish && e.countFish > 1) statLine = e.countFish + "× " + statLine;
+    }
+    if (e.type === "angeltag") {
+      var angeltagCatchCount = catchesForAngeltag(e).length;
+      if (angeltagCatchCount) statLine = "🐟 " + angeltagCatchCount;
     }
     var visibilityTagText = e.visibility ? (VISIBILITY_ICON[e.visibility] + " " + VISIBILITY_LABEL[e.visibility]) : null;
     var tags = cardTags(e);
