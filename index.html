@@ -1116,19 +1116,27 @@
   map.on("popupopen", function (ev) { hydratePhotos(ev.popup.getElement()); });
   L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
 
-  var streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a> contributors"
-  });
+  var MAPTILER_KEY = "plYwwjtV1yY1QgJLd4XI";
 
   var satelliteLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
     maxZoom: 19,
     attribution: "Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics, GIS User Community"
   }).addTo(map);
 
+  var mapTilerStreetLayer = L.tileLayer("https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?key=" + MAPTILER_KEY, {
+    maxZoom: 20,
+    attribution: "&copy; <a href=\"https://www.maptiler.com/copyright/\" target=\"_blank\" rel=\"noopener\">MapTiler</a> &copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a> contributors"
+  });
+
+  var mapTilerSatelliteLayer = L.tileLayer("https://api.maptiler.com/maps/satellite/256/{z}/{x}/{y}.jpg?key=" + MAPTILER_KEY, {
+    maxZoom: 20,
+    attribution: "&copy; <a href=\"https://www.maptiler.com/copyright/\" target=\"_blank\" rel=\"noopener\">MapTiler</a>"
+  });
+
   var BASE_LAYERS = [
-    { id: "satellite", label: "🛰️ Satellit (weltweit)", layer: satelliteLayer },
-    { id: "street", label: "🗺️ Straßenkarte (OpenStreetMap)", layer: streetLayer }
+    { id: "satellite", label: "🛰️ Satellit (Esri, weltweit)", layer: satelliteLayer },
+    { id: "street", label: "🗺️ Straßenkarte (MapTiler)", layer: mapTilerStreetLayer },
+    { id: "mt_satellite", label: "🛰️ Satellit (MapTiler)", layer: mapTilerSatelliteLayer }
   ];
   var activeBaseLayer = "satellite";
   var layerPickerPanelEl = null;
@@ -4655,7 +4663,7 @@
       ["Welche Daten werden erhoben", "Konto: E-Mail-Adresse, Passwort (sicher gehasht über Firebase Authentication, nicht im Klartext gespeichert), Anzeigename, optionaler Username, optionales Profilbild.<br>Inhalte: von dir angelegte Fänge, Spots, Parkplätze, Zugänge, Hinweise und Schutzzonen inkl. Standortdaten (Koordinaten), Fotos und weiterer von dir eingetragener Angaben (z.&nbsp;B. Wetter, Köder, Maße, Notizen). Enthält ein Foto GPS-/Kamera-Metadaten (EXIF), werden diese beim Hochladen nur lokal auf deinem Gerät ausgelesen, um Koordinaten vorzuschlagen – das gespeicherte Foto selbst wird beim Komprimieren vor dem Hochladen von diesen Metadaten befreit.<br>Vernetzung: welche anderen Nutzer du als \"Community\" oder \"Family&amp;Friends\" einstufst, sowie Verbindungsanfragen zwischen Nutzern.<br>Technisches: Zeitstempel von Erstellung/Änderung deiner Einträge."],
       ["Wofür werden die Daten verwendet", "Ausschließlich zur Bereitstellung der Kernfunktion der App: Speicherung, Anzeige und – je nach deiner Sichtbarkeitseinstellung – das Teilen deiner Angel-Einträge mit anderen von dir bestätigten Nutzern."],
       ["Weitergabe an andere Nutzer", "Ein Eintrag wird ausschließlich gemäß der von dir gewählten Sichtbarkeit (🔒 Privat / 🌐 Community / 👪 Family&amp;Friends) für andere Nutzer sichtbar – und auch dann nur für Nutzer, mit denen eine von beiden Seiten bestätigte Verbindung besteht. Als \"Privat\" eingestufte Einträge siehst ausschließlich du selbst. Eine Weitergabe an Nutzer außerhalb deiner bestätigten Verbindungen findet nicht statt."],
-      ["Externe Dienste", "Google Firebase (Authentication, Firestore-Datenbank, Storage) zur Speicherung aller App-Daten und Fotos; Auftragsverarbeiter Google Ireland Limited / Google LLC, Speicherort für Fotos innerhalb der EU (Frankfurt). Zusätzlich legt die App eine Offline-Kopie deiner Daten lokal auf deinem Gerät ab (Firestore-Offlinefunktion), damit sie auch ohne Internetverbindung nutzbar ist.<br>Open-Meteo (open-meteo.com) für den optionalen automatischen Abruf von Wetter- und Wasserdaten zu einem Eintrag: übermittelt werden dabei nur Koordinaten und Datum/Uhrzeit, keine personenbezogenen Daten.<br>BigDataCloud (bigdatacloud.net) zur automatischen Bestimmung des Landes anhand der Koordinaten eines Spots: übermittelt werden dabei nur Koordinaten, keine personenbezogenen Daten.<br>Schriftarten werden lokal mit der App ausgeliefert – beim Laden der App wird keine Verbindung zu Google oder anderen Schriftarten-Anbietern aufgebaut.<br>Es gibt kein Tracking und keine Werbe- oder Analyse-Dienste von Drittanbietern."],
+      ["Externe Dienste", "Google Firebase (Authentication, Firestore-Datenbank, Storage) zur Speicherung aller App-Daten und Fotos; Auftragsverarbeiter Google Ireland Limited / Google LLC, Speicherort für Fotos innerhalb der EU (Frankfurt). Zusätzlich legt die App eine Offline-Kopie deiner Daten lokal auf deinem Gerät ab (Firestore-Offlinefunktion), damit sie auch ohne Internetverbindung nutzbar ist.<br>Open-Meteo (open-meteo.com) für den optionalen automatischen Abruf von Wetter- und Wasserdaten zu einem Eintrag: übermittelt werden dabei nur Koordinaten und Datum/Uhrzeit, keine personenbezogenen Daten.<br>BigDataCloud (bigdatacloud.net) zur automatischen Bestimmung des Landes anhand der Koordinaten eines Spots: übermittelt werden dabei nur Koordinaten, keine personenbezogenen Daten.<br>MapTiler (maptiler.com) für die Darstellung von Straßenkarte und Satellitenbild: beim Laden der Karte wird der sichtbare Kartenausschnitt (Kachel-Koordinaten) an MapTiler übermittelt, keine personenbezogenen Daten.<br>Schriftarten werden lokal mit der App ausgeliefert – beim Laden der App wird keine Verbindung zu Google oder anderen Schriftarten-Anbietern aufgebaut.<br>Es gibt kein Tracking und keine Werbe- oder Analyse-Dienste von Drittanbietern."],
       ["Speicherdauer", "Deine Daten bleiben gespeichert, bis du sie selbst löschst oder uns über die oben genannte Kontaktadresse um Löschung deines Kontos bittest."],
       ["Deine Rechte", "Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Widerspruch gegen die Verarbeitung deiner Daten – wende dich dazu an die oben genannte Kontaktadresse. Einträge und Profildaten kannst du zudem jederzeit selbst in der App bearbeiten oder löschen. Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren – zuständig ist in der Regel die Behörde deines Wohnsitzes oder gewöhnlichen Aufenthaltsorts."],
       ["Datensicherheit", "Der Zugriff auf Daten wird serverseitig über Firestore Security Rules geprüft: Nur angemeldete, freigeschaltete Nutzer können die App nutzen, und jeder Nutzer kann grundsätzlich nur seine eigenen Einträge bearbeiten oder löschen."],
