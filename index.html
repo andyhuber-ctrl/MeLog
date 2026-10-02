@@ -1734,15 +1734,69 @@
     }
   });
 
-  map.doubleClickZoom.disable();
-  map.on("dblclick", function (ev) {
-    if (creatingNewZone || adminZoneEditMode || drawingPolygon || editingPolygonVertices) return;
+  function canCreateEntryNow() {
+    return !(creatingNewZone || adminZoneEditMode || drawingPolygon || editingPolygonVertices);
+  }
+  function startNewEntryAt(latlng) {
     if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
-    ghostMarker = L.circleMarker(ev.latlng, {
+    ghostMarker = L.circleMarker(latlng, {
       radius: 10, color: "#B9781A", weight: 2, dashArray: "3 3", fillOpacity: 0
     }).addTo(map);
-    openSheet(null, { lat: ev.latlng.lat, lng: ev.latlng.lng, type: "spot" });
+    openSheet(null, { lat: latlng.lat, lng: latlng.lng, type: "spot" });
+  }
+
+  map.doubleClickZoom.disable();
+  map.on("dblclick", function (ev) {
+    if (!canCreateEntryNow()) return;
+    startNewEntryAt(ev.latlng);
   });
+
+  // Touch devices: double-tap is unreliable (iOS often eats it as a zoom/scroll
+  // gesture before a "dblclick" is ever synthesized), so a long-press on empty
+  // map area is the touch equivalent of the dblclick-to-create gesture above.
+  (function () {
+    var LONG_PRESS_MS = 550;
+    var MOVE_TOLERANCE_PX = 12;
+    var IGNORE_SELECTOR = ".leaflet-marker-icon, .leaflet-interactive, .leaflet-popup-pane, .leaflet-control-container";
+    var pressTimer = null;
+    var pressStart = null;
+    var pressLatLng = null;
+
+    function cancelPress() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
+    }
+
+    var mapContainer = map.getContainer();
+    L.DomEvent.on(mapContainer, "touchstart", function (e) {
+      if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
+      if (e.touches.length !== 1 || !canCreateEntryNow() || (e.target.closest && e.target.closest(IGNORE_SELECTOR))) {
+        cancelPress();
+        return;
+      }
+      var touch = e.touches[0];
+      pressStart = { x: touch.clientX, y: touch.clientY };
+      pressLatLng = map.containerPointToLatLng(map.mouseEventToContainerPoint(touch));
+      ghostMarker = L.circleMarker(pressLatLng, {
+        radius: 10, color: "#B9781A", weight: 2, dashArray: "3 3", fillOpacity: 0
+      }).addTo(map);
+      pressTimer = setTimeout(function () {
+        pressTimer = null;
+        openSheet(null, { lat: pressLatLng.lat, lng: pressLatLng.lng, type: "spot" });
+      }, LONG_PRESS_MS);
+    }, map);
+
+    L.DomEvent.on(mapContainer, "touchmove", function (e) {
+      if (!pressTimer || !pressStart || e.touches.length !== 1) return;
+      var touch = e.touches[0];
+      var dx = touch.clientX - pressStart.x, dy = touch.clientY - pressStart.y;
+      if (Math.sqrt(dx * dx + dy * dy) > MOVE_TOLERANCE_PX) cancelPress();
+    }, map);
+
+    L.DomEvent.on(mapContainer, "touchend touchcancel", function () {
+      if (pressTimer) cancelPress();
+    }, map);
+  })();
 
   function openPhotoLightbox(photo) {
     if (!photo) return;
