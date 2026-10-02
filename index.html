@@ -55,6 +55,7 @@
     --hinweis: #C99A1E; --hinweis-wash: #F5ECD3;
     --essen: #B8562E; --essen-wash: #F7E3D3;
     --angelladen: #8C6239; --angelladen-wash: #EFE3D3;
+    --angeltag: #3F6B52; --angeltag-wash: #DCEEE2;
     --shadow: 0 8px 24px -12px rgba(8, 40, 44, 0.28);
     --radius: 8px;
   }
@@ -75,6 +76,7 @@
       --hinweis: #E8C463; --hinweis-wash: #332B14;
       --essen: #E8935F; --essen-wash: #3A2515;
       --angelladen: #C99C6B; --angelladen-wash: #332619;
+      --angeltag: #7FC79D; --angeltag-wash: #16301F;
       --shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.55);
     }
   }
@@ -273,6 +275,7 @@
   .map-filter-chip.active[data-type="hinweis"] { background: var(--hinweis); color: #241800; }
   .map-filter-chip.active[data-type="essen"] { background: var(--essen); }
   .map-filter-chip.active[data-type="angelladen"] { background: var(--angelladen); }
+  .map-filter-chip.active[data-type="angeltag"] { background: var(--angeltag); }
 
   .vertex-handle { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,0.4); cursor: grab; }
   .vertex-handle-mid { width: 14px; height: 14px; border-width: 2px; opacity: 0.8; cursor: copy; }
@@ -298,6 +301,7 @@
   .badge.hinweis { background: var(--hinweis-wash); color: var(--hinweis); }
   .badge.essen { background: var(--essen-wash); color: var(--essen); }
   .badge.angelladen { background: var(--angelladen-wash); color: var(--angelladen); }
+  .badge.angeltag { background: var(--angeltag-wash); color: var(--angeltag); }
   .card-body { flex: 1; min-width: 0; }
   .card-title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .card-title { font-weight: 700; }
@@ -347,6 +351,7 @@
   .pin-icon.schutzzone .dot { background: var(--schutzzone-ganzjaehrig); }
   .pin-icon.einlauf .dot { background: var(--einlauf); }
   .pin-icon.hinweis .dot { background: var(--hinweis); }
+  .pin-icon.angeltag .dot { background: var(--angeltag); }
   .pin-icon.fish { width: 38px; height: 22px; display: flex; align-items: center; justify-content: center; }
   .pin-icon.fish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
   .pin-icon.fish.unlanded img { opacity: 0.5; filter: grayscale(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
@@ -384,6 +389,7 @@
   .type-opt[aria-pressed="true"].spot { background: var(--spot); border-color: var(--spot); color: #10262A; }
   .type-opt[aria-pressed="true"].essen { background: var(--essen); border-color: var(--essen); color: #fff; }
   .type-opt[aria-pressed="true"].angelladen { background: var(--angelladen); border-color: var(--angelladen); color: #fff; }
+  .type-opt[aria-pressed="true"].angeltag { background: var(--angeltag); border-color: var(--angeltag); color: #fff; }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
   .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; color: var(--ink); font-size: 0.95rem; font-family: inherit; }
@@ -553,8 +559,8 @@
 (function () {
   "use strict";
 
-  var TYPE_LABEL = { spot: "Spot", catch: "Fang", parking: "Parken", access: "Zugang", schutzzone: "Schutzzone", einlauf: "Einlauf", hinweis: "Hinweis", essen: "Essen", angelladen: "Angelladen" };
-  var TYPE_ICON = { spot: "⊙", catch: "🐟", parking: "P", access: "→", schutzzone: "⛔", einlauf: "🌊", hinweis: "ℹ️", essen: "🍽️", angelladen: "🎣" };
+  var TYPE_LABEL = { spot: "Spot", catch: "Fang", parking: "Parken", access: "Zugang", schutzzone: "Schutzzone", einlauf: "Einlauf", hinweis: "Hinweis", essen: "Essen", angelladen: "Angelladen", angeltag: "Angeltag" };
+  var TYPE_ICON = { spot: "⊙", catch: "🐟", parking: "P", access: "→", schutzzone: "⛔", einlauf: "🌊", hinweis: "ℹ️", essen: "🍽️", angelladen: "🎣", angeltag: "📔" };
   var SPOT_CLASSES = ["hotspot", "spot", "potspot"];
   var SPOT_CLASS_LABEL = { hotspot: "Hotspot", spot: "Spot", potspot: "PotSpot" };
   var ZONE_CLASSES = ["ganzjaehrig", "zeitlich"];
@@ -884,10 +890,15 @@
     if (isPopup) tags = tags.filter(function (t) { return t !== "Fläche"; });
     else tags = tags.filter(function (t) { return t !== visibilityTagText; });
     var isCatch = e.type === "catch";
+    var isAngeltag = e.type === "angeltag";
     var metaBits = [];
     if (isCatch && e.date) metaBits.push(fmtDate(e.date));
+    if (isAngeltag && e.date) {
+      var timeRange = [e.timeFrom, e.timeTo].filter(Boolean).join("–");
+      metaBits.push(fmtDate(e.date) + (timeRange ? " · " + timeRange : ""));
+    }
     if (isPopup && isCatch && e.method) metaBits.push(e.method);
-    if (!isPopup && !isCatch && !hasPolygon(e)) metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
+    if (!isPopup && !isCatch && !isAngeltag && !hasPolygon(e)) metaBits.push(e.lat.toFixed(4) + ", " + e.lng.toFixed(4));
     if (!isPopup && e.createdBy) metaBits.push(e.createdBy);
     var badgeExtra = e.type === "spot" && spotClassOf(e) !== "spot" ? " " + spotClassOf(e)
       : e.type === "schutzzone" ? " " + zoneClassOf(e)
@@ -1066,7 +1077,7 @@
   var markerLayer = L.layerGroup().addTo(map);
   var ghostMarker = null;
   var moveMarker = null;
-  var mapTypeFilter = { spot: true, catch: true, parking: true, access: true, schutzzone: true, einlauf: true, hinweis: true, essen: true, angelladen: true };
+  var mapTypeFilter = { spot: true, catch: true, parking: true, access: true, schutzzone: true, einlauf: true, hinweis: true, essen: true, angelladen: true, angeltag: true };
 
   var SCHUTZZONE_LANDS = ["daenemark", "deutschland", "schweden", "norwegen"];
   var SCHUTZZONE_LAND_LABEL = { daenemark: "Dänemark", deutschland: "Deutschland", schweden: "Schweden", norwegen: "Norwegen" };
@@ -1607,7 +1618,7 @@
       "</div>" +
     "</div>";
 
-    ["access", "schutzzone", "hinweis", "essen", "angelladen"].forEach(function (t) {
+    ["access", "schutzzone", "hinweis", "essen", "angelladen", "angeltag"].forEach(function (t) {
       html += filterTypeRowHtml(t, TYPE_LABEL[t], false);
     });
 
@@ -1771,6 +1782,7 @@
       }
       renderStats();
       renderList();
+      if (aktivitaetenPageEl) renderAktivitaetenList();
     }, function (err) {
       console.error("Firestore-Fehler", err);
       document.getElementById("entriesLoadingHint").hidden = true;
@@ -1953,6 +1965,7 @@
     if (ev.target.closest(".card-photo-link")) openPhotoLightbox(entry.photo);
     if (ev.target.closest(".details-btn")) openSheet(entry, null, true);
     if (ev.target.closest(".locate-on-map")) {
+      closeAnyOpenPageView();
       document.querySelectorAll(".tab-btn").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-tab") === "map" ? "true" : "false"); });
       state.tab = "map";
       document.getElementById("mapPane").hidden = false;
@@ -2011,7 +2024,7 @@
   searchInput.addEventListener("input", function (ev) { state.search = ev.target.value; renderList(); });
 
   // ---- add/edit sheet ----
-  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [], einlauf: ["laichfluss"], hinweis: [] };
+  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [], einlauf: ["laichfluss"], hinweis: [], essen: [], angelladen: [], angeltag: ["dateTimeRange"] };
   var METHOD_LEGACY = { "Fliege": "Fliegenfischen", "Spinnrute": "Spinnfischen" };
   var DYN_FIELD_HTML = {
     laichfluss: '<div class="field"><div class="checkbox-field"><input type="checkbox" id="f_laichfluss" /><label for="f_laichfluss">Laichfluss (Fischaufstieg/Laichgewässer)</label></div></div>',
@@ -2038,7 +2051,12 @@
       "</select></div>" +
       '<div class="field"><label for="f_pressure">Luftdruck (hPa)</label><input id="f_pressure" type="number" inputmode="decimal" step="0.1" /></div>' +
     "</div>",
-    salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>'
+    salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>',
+    dateTimeRange: '<div class="field"><label for="f_angeltag_date">Datum</label><input id="f_angeltag_date" type="date" /></div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label for="f_time_from">Von</label><input id="f_time_from" type="time" /></div>' +
+        '<div class="field"><label for="f_time_to">Bis</label><input id="f_time_to" type="time" /></div>' +
+      "</div>"
   };
   var currentType = "spot", currentLanded = true, sheetEl = null;
   var currentGeometry = "point", pendingPolygon = [];
@@ -2076,6 +2094,7 @@
         '<button type="button" class="type-opt hinweis" data-type="hinweis">Hinweis</button>' +
         '<button type="button" class="type-opt essen" data-type="essen">Essen</button>' +
         '<button type="button" class="type-opt angelladen" data-type="angelladen">Angelladen</button>' +
+        '<button type="button" class="type-opt angeltag" data-type="angeltag">Angeltag</button>' +
       "</div>" +
       '<div id="nameFieldContainer"></div>' +
       '<div id="geomPickerContainer"></div>' +
@@ -2366,6 +2385,15 @@
       var fields = FIELDS_BY_TYPE[type];
       document.getElementById("dynamicFields").innerHTML = fields.map(function (f) { return DYN_FIELD_HTML[f] || ""; }).join("");
     }
+    var notesLabel = document.querySelector('label[for="f_notes"]');
+    var notesInput = document.getElementById("f_notes");
+    if (type === "angeltag") {
+      notesLabel.textContent = "Beobachtungen";
+      notesInput.placeholder = "Was hast du beobachtet? Vogelaktivität, Wasserbedingungen, Fischaktivität …";
+    } else {
+      notesLabel.textContent = "Notizen";
+      notesInput.placeholder = "Köder, Bedingungen, Beobachtungen …";
+    }
   }
 
   function fillDynamic(entry) {
@@ -2387,6 +2415,7 @@
   }
 
   function openSheet(entry, preset, viewOnly) {
+    closeAnyOpenPageView();
     map.closePopup();
     document.body.insertAdjacentHTML("beforeend", sheetTemplate());
     sheetEl = document.getElementById("sheetBackdrop");
@@ -2428,6 +2457,11 @@
       fillDynamic(entry);
       var laichflussEl = document.getElementById("f_laichfluss");
       if (laichflussEl && entry.laichfluss) laichflussEl.checked = true;
+      if (entry.type === "angeltag") {
+        if (document.getElementById("f_angeltag_date")) document.getElementById("f_angeltag_date").value = entry.date || "";
+        if (document.getElementById("f_time_from")) document.getElementById("f_time_from").value = entry.timeFrom || "";
+        if (document.getElementById("f_time_to")) document.getElementById("f_time_to").value = entry.timeTo || "";
+      }
     } else if (preset && preset.lat != null && preset.lng != null) {
       document.getElementById("f_lat").value = preset.lat.toFixed(6);
       document.getElementById("f_lng").value = preset.lng.toFixed(6);
@@ -3311,6 +3345,12 @@
       data.marked = currentLanded && !!(markedEl && markedEl.checked);
       data.markingNote = data.marked ? (g("f_marking_note").trim() || null) : null;
     }
+    if (currentType === "angeltag") {
+      var ga = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
+      data.date = ga("f_angeltag_date") || null;
+      data.timeFrom = ga("f_time_from") || null;
+      data.timeTo = ga("f_time_to") || null;
+    }
     var saveBtn = document.getElementById("saveBtn");
     saveBtn.disabled = true;
     saveBtn.textContent = "Speichert …";
@@ -3804,7 +3844,7 @@
       document.querySelector('.tab-btn[data-tab="' + btn.getAttribute("data-tab") + '"]').click();
     });
   });
-  document.getElementById("navDrawerActivitiesBtn").addEventListener("click", function () { closeNavDrawer(); showToast("Aktivitäten folgen in Kürze"); });
+  document.getElementById("navDrawerActivitiesBtn").addEventListener("click", function () { closeNavDrawer(); openAktivitaetenPage(); });
   document.getElementById("navDrawerSettingsBtn").addEventListener("click", function () { closeNavDrawer(); openSettingsSheet(); });
   document.getElementById("navDrawerPrivacyBtn").addEventListener("click", function () { closeNavDrawer(); openPrivacySheet(); });
   document.getElementById("navDrawerImpressumBtn").addEventListener("click", function () { closeNavDrawer(); openImpressumSheet(); });
@@ -3863,6 +3903,41 @@
     document.getElementById("agbCloseBtn").addEventListener("click", close);
   }
 
+  var aktivitaetenPageEl = null;
+  function renderAktivitaetenList() {
+    if (!aktivitaetenPageEl) return;
+    var listEl = document.getElementById("aktivitaetenList");
+    if (!listEl) return;
+    var entries = state.entries.filter(function (e) { return e.type === "angeltag"; })
+      .sort(function (a, b) { var da = a.date || a.createdAt || "", db_ = b.date || b.createdAt || ""; return da < db_ ? 1 : da > db_ ? -1 : 0; });
+    listEl.innerHTML = entries.length
+      ? '<div class="card-list">' + entries.map(function (e) {
+          try { return cardHtml(e); } catch (err) { console.error("Karte konnte nicht gerendert werden:", e.id, e.name, err); return ""; }
+        }).join("") + "</div>"
+      : '<div class="empty-state">Noch nichts hier. Tippe auf + um einen Angeltag hinzuzufügen.</div>';
+    hydratePhotos(listEl);
+  }
+  function closeAnyOpenPageView() {
+    document.querySelectorAll(".page-view").forEach(function (el) { el.remove(); });
+    aktivitaetenPageEl = null;
+  }
+  function openAktivitaetenPage() {
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="page-view" id="aktivitaetenPage">' +
+        '<button type="button" class="btn-secondary" id="aktivitaetenBackBtn" style="margin-bottom:14px">&larr; Zur&uuml;ck</button>' +
+        '<button type="button" class="btn-primary" id="aktivitaetenAddBtn" style="width:100%;margin-bottom:18px">+ Neuer Angeltag</button>' +
+        '<div id="aktivitaetenList"></div>' +
+      "</div>");
+    aktivitaetenPageEl = document.getElementById("aktivitaetenPage");
+    document.getElementById("aktivitaetenBackBtn").addEventListener("click", closeAnyOpenPageView);
+    document.getElementById("aktivitaetenAddBtn").addEventListener("click", function () {
+      closeAnyOpenPageView();
+      switchToMapTab();
+      openSheet(null, { type: "angeltag" });
+    });
+    renderAktivitaetenList();
+  }
+
   function openProfileViewSheet(uid) {
     var myUid = auth.currentUser && auth.currentUser.uid;
     if (!myUid) return;
@@ -3873,6 +3948,9 @@
     var stats = computeStatsFor(uid);
     var tier = !isSelf ? myTiers[uid] : null;
     var conn = !isSelf ? myConnections.find(function (c) { return c.otherUid === uid && c.status === "accepted"; }) : null;
+    var recentAngeltage = state.entries.filter(function (e) { return e.type === "angeltag" && e.ownerId === uid; })
+      .sort(function (a, b) { var da = a.date || a.createdAt || "", db_ = b.date || b.createdAt || ""; return da < db_ ? 1 : da > db_ ? -1 : 0; })
+      .slice(0, 5);
 
     document.body.insertAdjacentHTML("beforeend",
       '<div class="page-view" id="profileViewBackdrop">' +
@@ -3889,6 +3967,12 @@
           '<div class="profile-stat"><span class="val mono">' + stats.spots + '</span><span class="lbl">Spots</span></div>' +
           '<div class="profile-stat"><span class="val mono">&#127942; ' + stats.pbText + '</span><span class="lbl">Personal Best</span></div>' +
         "</div>" +
+        '<h3>Letzte Angeltage</h3>' +
+        (recentAngeltage.length
+          ? '<div class="card-list">' + recentAngeltage.map(function (e) {
+              try { return cardHtml(e, true); } catch (err) { console.error("Karte konnte nicht gerendert werden:", e.id, e.name, err); return ""; }
+            }).join("") + "</div>"
+          : '<div class="form-hint">Noch keine Angeltage.</div>') +
         (isSelf
           ? '<button type="button" class="btn-primary" id="profileViewEditBtn" style="width:100%">Profil bearbeiten</button>'
           : '<button type="button" class="btn-secondary" id="profileViewMapBtn" style="width:100%">&#128506;&#65039; Eintr&auml;ge auf Karte anzeigen</button>' +
