@@ -275,7 +275,6 @@
   .map-filter-chip.active[data-type="hinweis"] { background: var(--hinweis); color: #241800; }
   .map-filter-chip.active[data-type="essen"] { background: var(--essen); }
   .map-filter-chip.active[data-type="angelladen"] { background: var(--angelladen); }
-  .map-filter-chip.active[data-type="angeltag"] { background: var(--angeltag); }
 
   .vertex-handle { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,0.4); cursor: grab; }
   .vertex-handle-mid { width: 14px; height: 14px; border-width: 2px; opacity: 0.8; cursor: copy; }
@@ -351,7 +350,6 @@
   .pin-icon.schutzzone .dot { background: var(--schutzzone-ganzjaehrig); }
   .pin-icon.einlauf .dot { background: var(--einlauf); }
   .pin-icon.hinweis .dot { background: var(--hinweis); }
-  .pin-icon.angeltag .dot { background: var(--angeltag); }
   .pin-icon.fish { width: 38px; height: 22px; display: flex; align-items: center; justify-content: center; }
   .pin-icon.fish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
   .pin-icon.fish.unlanded img { opacity: 0.5; filter: grayscale(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
@@ -1498,6 +1496,7 @@
     markers = {};
     var failed = [];
     state.entries.forEach(function (e) {
+      if (e.type === "angeltag") return;
       if (!entryPassesFilter(e)) return;
       try {
         var areaColor = colorForEntry(e) || "#0E6E7A";
@@ -1618,7 +1617,7 @@
       "</div>" +
     "</div>";
 
-    ["access", "schutzzone", "hinweis", "essen", "angelladen", "angeltag"].forEach(function (t) {
+    ["access", "schutzzone", "hinweis", "essen", "angelladen"].forEach(function (t) {
       html += filterTypeRowHtml(t, TYPE_LABEL[t], false);
     });
 
@@ -2024,7 +2023,7 @@
   searchInput.addEventListener("input", function (ev) { state.search = ev.target.value; renderList(); });
 
   // ---- add/edit sheet ----
-  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [], einlauf: ["laichfluss"], hinweis: [], essen: [], angelladen: [], angeltag: ["dateTimeRange"] };
+  var FIELDS_BY_TYPE = { spot: [], catch: [], parking: [], access: [], schutzzone: [], einlauf: ["laichfluss"], hinweis: [], essen: [], angelladen: [], angeltag: ["spotPicker", "dateTimeRange"] };
   var METHOD_LEGACY = { "Fliege": "Fliegenfischen", "Spinnrute": "Spinnfischen" };
   var DYN_FIELD_HTML = {
     laichfluss: '<div class="field"><div class="checkbox-field"><input type="checkbox" id="f_laichfluss" /><label for="f_laichfluss">Laichfluss (Fischaufstieg/Laichgewässer)</label></div></div>',
@@ -2052,6 +2051,7 @@
       '<div class="field"><label for="f_pressure">Luftdruck (hPa)</label><input id="f_pressure" type="number" inputmode="decimal" step="0.1" /></div>' +
     "</div>",
     salinityPct: '<div class="field"><label for="f_sal">Salzgehalt (%)</label><input id="f_sal" type="text" /></div>',
+    spotPicker: '<div class="field"><label for="f_angeltag_spot">Spot</label><select id="f_angeltag_spot"><option value="">– Spot auswählen –</option></select></div>',
     dateTimeRange: '<div class="field"><label for="f_angeltag_date">Datum</label><input id="f_angeltag_date" type="date" /></div>' +
       '<div class="field-row">' +
         '<div class="field"><label for="f_time_from">Von</label><input id="f_time_from" type="time" /></div>' +
@@ -2324,17 +2324,29 @@
 
   function updateGeometrySections() {
     var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType];
-    document.getElementById("coordsSection").hidden = currentType === "catch" || isPolygonMode;
-    document.getElementById("moveOnMapBtn").hidden = isPolygonMode;
+    var isAngeltag = currentType === "angeltag";
+    document.getElementById("coordsSection").hidden = currentType === "catch" || isAngeltag || isPolygonMode;
+    document.getElementById("moveOnMapBtn").hidden = isAngeltag || isPolygonMode;
     document.getElementById("polygonSection").hidden = !isPolygonMode;
     if (isPolygonMode) updatePolygonStatus();
+  }
+
+  function updateAngeltagSpotField(presetSpotId) {
+    var select = document.getElementById("f_angeltag_spot");
+    if (!select) return;
+    var spots = state.entries.filter(function (e) { return e.type === "spot"; }).sort(function (a, b) {
+      return (a.name || "").localeCompare(b.name || "", "de");
+    });
+    select.innerHTML = '<option value="">– Spot auswählen –</option>' +
+      spots.map(function (s) { return '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.name || "Spot") + "</option>"; }).join("");
+    select.value = presetSpotId || "";
   }
 
   function setType(type) {
     currentType = type;
     currentGeometry = ALWAYS_POLYGON_TYPES[type] ? "polygon" : "point";
     document.querySelectorAll("#mainTypePicker .type-opt").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-type") === type ? "true" : "false"); });
-    document.getElementById("nameFieldContainer").innerHTML = type === "catch" ? "" : nameFieldHtml(false, null);
+    document.getElementById("nameFieldContainer").innerHTML = (type === "catch" || type === "angeltag") ? "" : nameFieldHtml(false, null);
     var extraHtml = "";
     if (type === "spot") extraHtml = spotClassPickerHtml() + monthPickerHtml() + substratePickerHtml();
     else if (type === "schutzzone") extraHtml = zoneClassPickerHtml();
@@ -2384,6 +2396,7 @@
     } else {
       var fields = FIELDS_BY_TYPE[type];
       document.getElementById("dynamicFields").innerHTML = fields.map(function (f) { return DYN_FIELD_HTML[f] || ""; }).join("");
+      if (type === "angeltag") updateAngeltagSpotField();
     }
     var notesLabel = document.querySelector('label[for="f_notes"]');
     var notesInput = document.getElementById("f_notes");
@@ -2450,7 +2463,8 @@
       });
     });
     if (entry) {
-      document.getElementById("f_name").value = entry.name || "";
+      var nameEl = document.getElementById("f_name");
+      if (nameEl) nameEl.value = entry.name || "";
       document.getElementById("f_lat").value = entry.lat;
       document.getElementById("f_lng").value = entry.lng;
       document.getElementById("f_notes").value = entry.notes || "";
@@ -2458,6 +2472,7 @@
       var laichflussEl = document.getElementById("f_laichfluss");
       if (laichflussEl && entry.laichfluss) laichflussEl.checked = true;
       if (entry.type === "angeltag") {
+        updateAngeltagSpotField(entry.spotId);
         if (document.getElementById("f_angeltag_date")) document.getElementById("f_angeltag_date").value = entry.date || "";
         if (document.getElementById("f_time_from")) document.getElementById("f_time_from").value = entry.timeFrom || "";
         if (document.getElementById("f_time_to")) document.getElementById("f_time_to").value = entry.timeTo || "";
@@ -3291,8 +3306,16 @@
   function saveEntry() {
     if (photoProcessing) { showToast("Foto wird noch komprimiert – bitte kurz warten"); return; }
     var isPolygonMode = !!ALWAYS_POLYGON_TYPES[currentType];
-    var lat, lng, polygon = null;
-    if (isPolygonMode) {
+    var isAngeltag = currentType === "angeltag";
+    var lat, lng, polygon = null, angeltagSpot = null;
+    if (isAngeltag) {
+      var spotSelect = document.getElementById("f_angeltag_spot");
+      var spotId = spotSelect ? spotSelect.value : "";
+      angeltagSpot = spotId ? state.entries.find(function (e) { return e.id === spotId && e.type === "spot"; }) : null;
+      if (!angeltagSpot) { showToast("Bitte einen Spot auswählen"); return; }
+      lat = angeltagSpot.lat;
+      lng = angeltagSpot.lng;
+    } else if (isPolygonMode) {
       if (pendingPolygon.length < 3) { showToast("Bitte zuerst eine Fläche mit mindestens 3 Punkten zeichnen"); return; }
       polygon = pendingPolygon;
       var sums = polygon.reduce(function (s, p) { s.lat += p.lat; s.lng += p.lng; return s; }, { lat: 0, lng: 0 });
@@ -3305,7 +3328,7 @@
     }
     var data = {
       type: currentType,
-      name: document.getElementById("f_name").value.trim() || TYPE_LABEL[currentType],
+      name: isAngeltag ? (angeltagSpot.name || TYPE_LABEL[currentType]) : (document.getElementById("f_name").value.trim() || TYPE_LABEL[currentType]),
       lat: lat, lng: lng,
       polygon: polygon,
       spotClass: currentType === "spot" ? currentSpotClass : null,
@@ -3347,6 +3370,8 @@
     }
     if (currentType === "angeltag") {
       var ga = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
+      data.spotId = angeltagSpot.id;
+      data.spotName = angeltagSpot.name || null;
       data.date = ga("f_angeltag_date") || null;
       data.timeFrom = ga("f_time_from") || null;
       data.timeTo = ga("f_time_to") || null;
