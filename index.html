@@ -106,6 +106,43 @@
   .topbar-wordmark { display: block; font-family: "Big Shoulders Stencil Display", system-ui, sans-serif; font-weight: 800; letter-spacing: 0.06em; font-size: 1.3rem; color: #F3FBFA; text-shadow: 0 1px 3px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5); }
   .profile-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; justify-self: end; overflow: hidden; }
   .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+  .nav-drawer-backdrop {
+    position: fixed; inset: 0; z-index: 1300;
+    background: rgba(6,20,22,0.5);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .nav-drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+  .nav-drawer {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 80%; max-width: 320px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    display: flex; flex-direction: column;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+  }
+  .nav-drawer-backdrop.open .nav-drawer { transform: translateX(0); }
+  .nav-drawer-close { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 14px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .nav-drawer-logo { text-align: center; font-family: "Big Shoulders Stencil Display", system-ui, sans-serif; font-weight: 800; letter-spacing: 0.06em; font-size: 1.3rem; color: var(--ink); margin: 6px 0 18px; }
+  .nav-drawer-profile-row { display: flex; align-items: center; gap: 12px; width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 18px; cursor: pointer; text-align: left; font-family: inherit; }
+  .nav-drawer-profile-row .profile-avatar { width: 38px; height: 38px; font-size: 1.3rem; border-color: var(--border); background: var(--surface); color: var(--ink); }
+  .nav-drawer-profile-name { font-weight: 700; color: var(--ink); font-size: 0.95rem; }
+  .nav-drawer-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 18px; }
+  .nav-drawer-list button, .nav-drawer-footer button, .nav-drawer-footer a {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    background: none; border: none; text-align: left; text-decoration: none;
+    padding: 11px 6px; border-radius: 8px; cursor: pointer;
+    font-size: 0.92rem; color: var(--ink); font-family: inherit;
+  }
+  .nav-drawer-list button:active, .nav-drawer-footer button:active, .nav-drawer-footer a:active { background: var(--surface-2); }
+  .nav-drawer-list .icon { font-size: 1.1rem; width: 22px; text-align: center; flex: 0 0 auto; }
+  .nav-drawer-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+  .nav-drawer-footer button, .nav-drawer-footer a { font-size: 0.82rem; color: var(--ink-soft); padding: 7px 6px; }
+  .nav-drawer-version { font-size: 0.7rem; color: var(--ink-faint); text-align: center; margin-top: 10px; }
   .profile-photo-row { display: flex; align-items: center; gap: 12px; }
   .profile-photo-preview { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
   .profile-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
@@ -413,8 +450,36 @@
       <span class="topbar-wordmark">MELOG</span>
     </div>
     <div class="stats" id="statsRow"></div>
-    <button type="button" id="profileBtn" class="profile-avatar" aria-label="Profil">&#128100;</button>
+    <button type="button" id="menuBtn" class="profile-avatar" aria-label="Menü">&#9776;</button>
   </header>
+
+  <div class="nav-drawer-backdrop" id="navDrawerBackdrop" hidden>
+    <div class="nav-drawer">
+      <button type="button" class="nav-drawer-close" id="navDrawerCloseBtn" aria-label="Schließen">✕</button>
+      <div class="nav-drawer-logo">MELOG</div>
+      <button type="button" class="nav-drawer-profile-row" id="navDrawerProfileBtn">
+        <span class="profile-avatar" id="navDrawerAvatar">&#128100;</span>
+        <span class="nav-drawer-profile-name" id="navDrawerName">–</span>
+      </button>
+      <nav class="nav-drawer-list">
+        <button type="button" data-tab="map"><span class="icon">🗺️</span> Karte</button>
+        <button type="button" id="navDrawerActivitiesBtn"><span class="icon">📊</span> Aktivitäten</button>
+        <button type="button" data-tab="catch"><span class="icon">🎣</span> Fänge</button>
+        <button type="button" data-tab="spot"><span class="icon">📍</span> Spots</button>
+        <button type="button" data-tab="bait"><span class="icon">🪱</span> Köder</button>
+        <button type="button" data-tab="network"><span class="icon">🤝</span> Netzwerk</button>
+        <button type="button" id="navDrawerSettingsBtn"><span class="icon">⚙️</span> Einstellungen</button>
+      </nav>
+      <div class="nav-drawer-footer">
+        <button type="button" id="navDrawerPrivacyBtn">Datenschutz</button>
+        <button type="button" id="navDrawerImpressumBtn">Impressum</button>
+        <button type="button" id="navDrawerFaqBtn">FAQ</button>
+        <a href="mailto:andy_huber@gmx.net">Kontakt</a>
+        <button type="button" id="navDrawerAgbBtn">AGB</button>
+        <div class="nav-drawer-version">MeLog &middot; Stand 02.10.2026</div>
+      </div>
+    </div>
+  </div>
 
   <nav class="tabs" role="tablist">
     <button class="tab-btn" data-tab="map" role="tab" aria-selected="true">Karte</button>
@@ -779,7 +844,9 @@
   }
 
   function updateProfileAvatarButton() {
-    var btn = document.getElementById("profileBtn");
+    var nameEl = document.getElementById("navDrawerName");
+    if (nameEl) nameEl.textContent = (auth.currentUser && auth.currentUser.displayName) || "Profil";
+    var btn = document.getElementById("navDrawerAvatar");
     if (!btn) return;
     if (!myPhotoPath) {
       btn.innerHTML = "&#128100;";
@@ -3709,7 +3776,89 @@
     });
   }
 
-  document.getElementById("profileBtn").addEventListener("click", openProfileSheet);
+  var navDrawerBackdrop = document.getElementById("navDrawerBackdrop");
+  var navDrawerRaf = null, navDrawerCloseTimer = null;
+  function openNavDrawer() {
+    if (navDrawerCloseTimer) { clearTimeout(navDrawerCloseTimer); navDrawerCloseTimer = null; }
+    if (navDrawerRaf) { cancelAnimationFrame(navDrawerRaf); navDrawerRaf = null; }
+    navDrawerBackdrop.hidden = false;
+    updateProfileAvatarButton();
+    navDrawerRaf = requestAnimationFrame(function () { navDrawerBackdrop.classList.add("open"); navDrawerRaf = null; });
+  }
+  function closeNavDrawer() {
+    if (navDrawerRaf) { cancelAnimationFrame(navDrawerRaf); navDrawerRaf = null; }
+    if (navDrawerCloseTimer) clearTimeout(navDrawerCloseTimer);
+    navDrawerBackdrop.classList.remove("open");
+    navDrawerCloseTimer = setTimeout(function () { navDrawerBackdrop.hidden = true; navDrawerCloseTimer = null; }, 250);
+  }
+  document.getElementById("menuBtn").addEventListener("click", openNavDrawer);
+  document.getElementById("navDrawerCloseBtn").addEventListener("click", closeNavDrawer);
+  navDrawerBackdrop.addEventListener("click", function (ev) { if (ev.target === navDrawerBackdrop) closeNavDrawer(); });
+  document.getElementById("navDrawerProfileBtn").addEventListener("click", function () { closeNavDrawer(); openProfileSheet(); });
+  document.querySelectorAll(".nav-drawer-list [data-tab]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      closeNavDrawer();
+      document.querySelector('.tab-btn[data-tab="' + btn.getAttribute("data-tab") + '"]').click();
+    });
+  });
+  document.getElementById("navDrawerActivitiesBtn").addEventListener("click", function () { closeNavDrawer(); showToast("Aktivitäten folgen in Kürze"); });
+  document.getElementById("navDrawerSettingsBtn").addEventListener("click", function () { closeNavDrawer(); openSettingsSheet(); });
+  document.getElementById("navDrawerPrivacyBtn").addEventListener("click", function () { closeNavDrawer(); openPrivacySheet(); });
+  document.getElementById("navDrawerImpressumBtn").addEventListener("click", function () { closeNavDrawer(); openImpressumSheet(); });
+  document.getElementById("navDrawerFaqBtn").addEventListener("click", function () { closeNavDrawer(); openFaqSheet(); });
+  document.getElementById("navDrawerAgbBtn").addEventListener("click", function () { closeNavDrawer(); openAgbSheet(); });
+
+  function openImpressumSheet() {
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="impressumBackdrop"><div class="sheet">' +
+        '<h2>Impressum</h2>' +
+        '<div class="form-hint">Andreas Huber<br>Kontakt: ' + ADMIN_EMAIL + '<br>MeLog ist ein privates, nicht-kommerzielles Projekt &ndash; kein Unternehmen, kein geschäftsmäßiges Angebot.</div>' +
+        '<div class="sheet-actions" style="margin-top:16px">' +
+          '<button type="button" class="btn-secondary" id="impressumCloseBtn" style="flex:1">Schließen</button>' +
+        "</div>" +
+      "</div></div>");
+    var backdrop = document.getElementById("impressumBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("impressumCloseBtn").addEventListener("click", close);
+  }
+
+  function openFaqSheet() {
+    var faqs = [
+      ["Wie lege ich einen neuen Eintrag an?", "Auf der Karte doppelklicken (am Smartphone: Finger gedrückt halten) oder den runden +-Button unten rechts nutzen."],
+      ["Was bedeuten Privat / Community / Family&Friends?", "Das ist die Sichtbarkeit eines Eintrags: Privat siehst nur du, Community und Family&Friends teilen ihn mit entsprechend eingestuften Verbindungen (siehe Reiter Netzwerk)."],
+      ["Wie vernetze ich mich mit anderen Nutzern?", "Im Reiter Netzwerk nach Name oder E-Mail suchen und eine Anfrage senden. Nach Bestätigung kannst du die Verbindung als Community oder Family&Friends einstufen."],
+      ["Wie ändere ich mein Passwort?", "Im Menü auf dein Profil tippen, dort findest du den Button \"Passwort ändern\"."],
+      ["Wie lösche ich mein Konto?", "Bitte per Kontakt-Link unten im Menü eine Nachricht schicken."]
+    ];
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="faqBackdrop"><div class="sheet">' +
+        '<h2>FAQ</h2>' +
+        faqs.map(function (f) { return "<h3>" + f[0] + "</h3><div class=\"form-hint\" style=\"margin-top:-2px\">" + f[1] + "</div>"; }).join("") +
+        '<div class="sheet-actions" style="margin-top:16px">' +
+          '<button type="button" class="btn-secondary" id="faqCloseBtn" style="flex:1">Schließen</button>' +
+        "</div>" +
+      "</div></div>");
+    var backdrop = document.getElementById("faqBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("faqCloseBtn").addEventListener("click", close);
+  }
+
+  function openAgbSheet() {
+    document.body.insertAdjacentHTML("beforeend",
+      '<div class="sheet-backdrop" id="agbBackdrop"><div class="sheet">' +
+        '<h2>AGB</h2>' +
+        '<div class="form-hint">Die Allgemeinen Geschäftsbedingungen werden gerade sorgfältig ausgearbeitet und folgen in Kürze an dieser Stelle.</div>' +
+        '<div class="sheet-actions" style="margin-top:16px">' +
+          '<button type="button" class="btn-secondary" id="agbCloseBtn" style="flex:1">Schließen</button>' +
+        "</div>" +
+      "</div></div>");
+    var backdrop = document.getElementById("agbBackdrop");
+    function close() { backdrop.remove(); }
+    backdrop.addEventListener("click", function (ev) { if (ev.target === backdrop) close(); });
+    document.getElementById("agbCloseBtn").addEventListener("click", close);
+  }
 
   function openProfileSheet() {
     var user = auth.currentUser;
