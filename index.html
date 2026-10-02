@@ -1081,6 +1081,8 @@
   var moveMarker = null;
   var angeltagPickMode = null;
   var angeltagPickToolbarEl = null;
+  var pendingPointPlacementType = null;
+  var pointPlacementToolbarEl = null;
   var mapTypeFilter = { spot: true, catch: true, parking: true, access: true, schutzzone: true, einlauf: true, hinweis: true, essen: true, angelladen: true, angeltag: true };
 
   var SCHUTZZONE_LANDS = ["daenemark", "deutschland", "schweden", "norwegen"];
@@ -1557,6 +1559,22 @@
     var failed = [];
     state.entries.forEach(function (e) {
       if (e.type === "angeltag") return;
+      if (pendingPointPlacementType) {
+        if (!entryPassesFilter(e)) return;
+        try {
+          var ppColor = colorForEntry(e) || "#0E6E7A";
+          var ppWeight = e.type === "spot" ? 1.5 : 2;
+          var ppLayer = hasPolygon(e)
+            ? L.polygon(polygonLatLngs(e), { color: ppColor, weight: ppWeight, fillColor: ppColor, fillOpacity: 0.25 }).addTo(markerLayer)
+            : L.marker([e.lat, e.lng], { icon: makeIcon(e) }).addTo(markerLayer);
+          ppLayer.on("click", function (ev) { L.DomEvent.stopPropagation(ev); finishPointPlacement(ev.latlng); });
+          markers[e.id] = ppLayer;
+        } catch (err) {
+          failed.push(e);
+          console.error("Eintrag konnte nicht auf der Karte angezeigt werden:", e.id, e.name, err);
+        }
+        return;
+      }
       if (angeltagPickMode && e.type === "spot") {
         try {
           var pickColor = colorForEntry(e) || "#0E6E7A";
@@ -1923,6 +1941,10 @@
   });
 
   map.on("click", function (ev) {
+    if (pendingPointPlacementType) {
+      finishPointPlacement(ev.latlng);
+      return;
+    }
     if (creatingNewZone) {
       newZonePoints.push(ev.latlng);
       redrawNewZonePreview();
@@ -1939,7 +1961,7 @@
   });
 
   function canCreateEntryNow() {
-    return !(creatingNewZone || adminZoneEditMode || drawingPolygon || editingPolygonVertices || angeltagPickMode);
+    return !(creatingNewZone || adminZoneEditMode || drawingPolygon || editingPolygonVertices || angeltagPickMode || pendingPointPlacementType);
   }
   function startNewEntryAt(latlng) {
     if (ghostMarker) { map.removeLayer(ghostMarker); ghostMarker = null; }
@@ -3554,7 +3576,47 @@
     });
   }
 
-  function openHinweisTypeChooserSheet(lat, lng) {
+  function startPointPlacement(type) {
+    switchToMapTab();
+    pendingPointPlacementType = type;
+    pointPlacementToolbarEl = document.createElement("div");
+    pointPlacementToolbarEl.className = "draw-toolbar";
+    pointPlacementToolbarEl.innerHTML =
+      '<div class="draw-toolbar-hint">Tippe auf die Karte, um den Standort f&uuml;r „' + TYPE_LABEL[type] + '“ festzulegen.</div>' +
+      '<div class="draw-toolbar-actions">' +
+        '<button type="button" class="btn-secondary" id="pointPlacementCancelBtn">✕ Abbrechen</button>' +
+      "</div>";
+    document.body.appendChild(pointPlacementToolbarEl);
+    document.getElementById("pointPlacementCancelBtn").addEventListener("click", cancelPointPlacement);
+    rebuildMarkers();
+    showToast("Tippe auf die Karte, um die Position festzulegen");
+  }
+
+  function cancelPointPlacement() {
+    if (!pendingPointPlacementType) return;
+    pendingPointPlacementType = null;
+    if (pointPlacementToolbarEl) { pointPlacementToolbarEl.remove(); pointPlacementToolbarEl = null; }
+    rebuildMarkers();
+  }
+
+  function finishPointPlacement(latlng) {
+    var type = pendingPointPlacementType;
+    cancelPointPlacement();
+    openSheet(null, { type: type, lat: latlng.lat, lng: latlng.lng });
+  }
+
+  function beginEntryCreation(type) {
+    if (type === "angeltag") {
+      openSheet(null, { type: type });
+    } else if (ALWAYS_POLYGON_TYPES[type]) {
+      openSheet(null, { type: type });
+      startPolygonDrawing();
+    } else {
+      startPointPlacement(type);
+    }
+  }
+
+  function openHinweisTypeChooserSheet() {
     var types = ["parking", "access", "schutzzone", "einlauf", "hinweis", "essen", "angelladen"];
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="hinweisTypeChooserBackdrop"><div class="sheet">' +
@@ -3571,12 +3633,12 @@
     backdrop.querySelectorAll("[data-type]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         close();
-        openSheet(null, { lat: lat, lng: lng, type: btn.getAttribute("data-type") });
+        beginEntryCreation(btn.getAttribute("data-type"));
       });
     });
   }
 
-  function openTypeChooserSheet(lat, lng) {
+  function openTypeChooserSheet() {
     document.body.insertAdjacentHTML("beforeend",
       '<div class="sheet-backdrop" id="typeChooserBackdrop"><div class="sheet">' +
         '<h2>Was möchtest du anlegen?</h2>' +
@@ -3595,18 +3657,17 @@
     backdrop.querySelectorAll("[data-type]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         close();
-        openSheet(null, { lat: lat, lng: lng, type: btn.getAttribute("data-type") });
+        beginEntryCreation(btn.getAttribute("data-type"));
       });
     });
     document.getElementById("typeChooserHinweisBtn").addEventListener("click", function () {
       close();
-      openHinweisTypeChooserSheet(lat, lng);
+      openHinweisTypeChooserSheet();
     });
   }
 
   document.getElementById("fabAdd").addEventListener("click", function () {
-    var c = map.getCenter();
-    openTypeChooserSheet(c.lat, c.lng);
+    openTypeChooserSheet();
   });
 
   document.getElementById("fabPhotoCatch").addEventListener("click", function () {
