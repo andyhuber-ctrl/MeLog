@@ -1126,19 +1126,9 @@
     attribution: "Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics, GIS User Community"
   }).addTo(map);
 
-  var shDopLayer = L.tileLayer.wms("https://dienste.gdi-sh.de/WMS_SH_DOP20col_OpenGBD", {
-    layers: "sh_dop20_rgb",
-    format: "image/png",
-    transparent: false,
-    maxZoom: 20,
-    bounds: L.latLngBounds([53.298791, 7.823156], [55.154323, 11.415539]),
-    attribution: "&copy; GeoBasis-DE/LVermGeo SH/CC BY 4.0"
-  });
-
   var BASE_LAYERS = [
     { id: "satellite", label: "🛰️ Satellit (weltweit)", layer: satelliteLayer },
-    { id: "street", label: "🗺️ Straßenkarte (OpenStreetMap)", layer: streetLayer },
-    { id: "sh_dop", label: "📷 Luftbild Schleswig-Holstein (20cm)", layer: shDopLayer }
+    { id: "street", label: "🗺️ Straßenkarte (OpenStreetMap)", layer: streetLayer }
   ];
   var activeBaseLayer = "satellite";
   var layerPickerPanelEl = null;
