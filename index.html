@@ -165,6 +165,7 @@
 
   nav.tabs { flex: 0 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: transparent; padding: 10px 16px; border-bottom: none; }
   .tab-btn {
+    position: relative;
     border: 1px solid rgba(255,255,255,0.2); background: rgba(21,23,26,0.42);
     -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     color: #F0ECE4; text-shadow: 0 1px 2px rgba(0,0,0,0.55);
@@ -172,6 +173,9 @@
     text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .tab-btn[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; text-shadow: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 0.68rem; font-weight: 700; line-height: 1; }
+  .tab-btn .nav-badge { position: absolute; top: 3px; right: 6px; }
+  .nav-drawer-list .nav-badge { margin-left: auto; }
 
   main { flex: 1; min-height: 0; position: relative; }
   #mapPane { position: absolute; inset: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px)) 14px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
@@ -496,7 +500,7 @@
         <button type="button" data-tab="catch"><span class="icon">🎣</span> Fänge</button>
         <button type="button" data-tab="spot"><span class="icon">📍</span> Spots</button>
         <button type="button" data-tab="bait"><span class="icon">🪱</span> Köder</button>
-        <button type="button" data-tab="network"><span class="icon">🤝</span> Netzwerk</button>
+        <button type="button" data-tab="network"><span class="icon">🤝</span> Netzwerk<span class="nav-badge" id="networkDrawerBadge" hidden></span></button>
         <button type="button" id="navDrawerSettingsBtn"><span class="icon">⚙️</span> Einstellungen</button>
       </nav>
       <div class="nav-drawer-footer">
@@ -515,7 +519,7 @@
     <button class="tab-btn" data-tab="catch" role="tab" aria-selected="false">F&auml;nge</button>
     <button class="tab-btn" data-tab="spot" role="tab" aria-selected="false">Spots</button>
     <button class="tab-btn" data-tab="bait" role="tab" aria-selected="false">Köder</button>
-    <button class="tab-btn" data-tab="network" role="tab" aria-selected="false">Netzwerk</button>
+    <button class="tab-btn" data-tab="network" role="tab" aria-selected="false">Netzwerk<span class="nav-badge" id="networkTabBadge" hidden></span></button>
   </nav>
 
   <div class="profile-filter-banner" id="profileFilterBanner" hidden>
@@ -2048,6 +2052,17 @@
     refreshOwnEntriesVisibility();
   }
 
+  function showNetworkToastFor(otherUid, prefix, suffix) {
+    if (connectionsUsersCache[otherUid]) {
+      showToast(prefix + otherUserLabel(otherUid) + suffix);
+      return;
+    }
+    db.collection("users").doc(otherUid).get().then(function (doc) {
+      if (doc.exists) connectionsUsersCache[otherUid] = doc.data();
+      showToast(prefix + otherUserLabel(otherUid) + suffix);
+    });
+  }
+
   function subscribeConnections() {
     var uid = auth.currentUser.uid;
     if (unsubscribeConnections) unsubscribeConnections();
@@ -2058,11 +2073,24 @@
         var otherUid = d.users[0] === uid ? d.users[1] : d.users[0];
         list.push({ id: doc.id, otherUid: otherUid, status: d.status, requestedBy: d.requestedBy });
       });
+      if (connectionsLoadedOnce) {
+        snap.docChanges().forEach(function (change) {
+          var d = change.doc.data();
+          var otherUid = d.users[0] === uid ? d.users[1] : d.users[0];
+          if (change.type === "added" && d.status === "pending" && d.requestedBy !== uid) {
+            showNetworkToastFor(otherUid, "🤝 Neue Netzwerkanfrage von ", "");
+          } else if (change.type === "modified" && d.status === "accepted" && d.requestedBy === uid) {
+            showNetworkToastFor(otherUid, "✅ ", " hat deine Anfrage angenommen");
+          }
+        });
+      }
       myConnections = list;
       connectionsLoadedOnce = true;
       maybeReconcileVisibilityOnce();
       renderConnectionsSheetIfOpen();
+      updateNetworkBadge();
     }, function (err) { console.error("Verbindungen-Fehler", err); });
+    loadConnectionsUserCache();
     if (unsubscribeTiers) unsubscribeTiers();
     unsubscribeTiers = db.collection("users").doc(uid).collection("private").doc("connectionTiers").onSnapshot(function (doc) {
       myTiers = (doc.exists && doc.data().tiers) || {};
@@ -2070,6 +2098,17 @@
       maybeReconcileVisibilityOnce();
       renderConnectionsSheetIfOpen();
     }, function (err) { console.error("Einstufungen-Fehler", err); });
+  }
+
+  function updateNetworkBadge() {
+    var myUid = auth.currentUser && auth.currentUser.uid;
+    var count = myUid ? myConnections.filter(function (c) { return c.status === "pending" && c.requestedBy !== myUid; }).length : 0;
+    ["networkTabBadge", "networkDrawerBadge"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = count > 9 ? "9+" : String(count);
+      el.hidden = count === 0;
+    });
   }
 
   function unsubscribeAndReset() {
@@ -2083,6 +2122,7 @@
     connectionsLoadedOnce = false;
     tiersLoadedOnce = false;
     reconciledThisSession = false;
+    updateNetworkBadge();
   }
 
   map.on("popupopen", function () {
